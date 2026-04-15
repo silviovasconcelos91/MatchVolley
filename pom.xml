@@ -14,7 +14,7 @@
     <name>VolleyMatch</name>
     <description>VolleyMatch</description>
     <properties>
-        <java.version>25</java.version>
+        <java.version>21</java.version>
     </properties>
     <dependencies>
         <dependency>
@@ -101,6 +101,7 @@
                             <version>0.2.0</version>
                         </path>
                     </annotationProcessorPaths>
+                    <release>21</release>
                 </configuration>
             </plugin>
             <plugin>
