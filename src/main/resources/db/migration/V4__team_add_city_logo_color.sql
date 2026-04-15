@@ -1,0 +1,2 @@
+ALTER TABLE teams ADD COLUMN city       VARCHAR(100);
+ALTER TABLE teams ADD COLUMN logo_color VARCHAR(20);

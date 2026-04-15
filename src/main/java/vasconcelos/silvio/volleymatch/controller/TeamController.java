@@ -1,0 +1,57 @@
+package vasconcelos.silvio.volleymatch.controller;
+
+import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+import vasconcelos.silvio.volleymatch.dto.common.ApiResponse;
+import vasconcelos.silvio.volleymatch.dto.team.CreateTeamRequest;
+import vasconcelos.silvio.volleymatch.dto.team.TeamDto;
+import vasconcelos.silvio.volleymatch.service.TeamService;
+
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1/teams")
+@RequiredArgsConstructor
+public class
+TeamController {
+
+    private final TeamService teamService;
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<List<TeamDto>>> getAllTeams() {
+        List<TeamDto> teams = teamService.getAllTeams();
+        return ResponseEntity.ok(ApiResponse.<List<TeamDto>>builder()
+                .data(teams)
+                .message("Teams retrieved successfully")
+                .status(HttpStatus.OK.value())
+                .build());
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<ApiResponse<TeamDto>> getTeam(@PathVariable Long id) {
+        TeamDto team = teamService.getTeam(id);
+        return ResponseEntity.ok(ApiResponse.<TeamDto>builder()
+                .data(team)
+                .message("Team retrieved successfully")
+                .status(HttpStatus.OK.value())
+                .build());
+    }
+
+    @PostMapping
+    public ResponseEntity<ApiResponse<TeamDto>> createTeam(@RequestBody CreateTeamRequest request) {
+        TeamDto created = teamService.createTeam(request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.<TeamDto>builder()
+                        .data(created)
+                        .message("Team created successfully")
+                        .status(HttpStatus.CREATED.value())
+                        .build());
+    }
+}

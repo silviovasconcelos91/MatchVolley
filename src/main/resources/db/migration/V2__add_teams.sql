@@ -1,0 +1,6 @@
+CREATE TABLE teams (
+    id   BIGSERIAL    PRIMARY KEY,
+    name VARCHAR(255) NOT NULL
+);
+
+ALTER TABLE players ADD COLUMN team_id BIGINT REFERENCES teams(id);
