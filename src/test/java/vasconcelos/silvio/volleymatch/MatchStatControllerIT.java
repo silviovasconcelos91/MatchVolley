@@ -70,8 +70,8 @@ class MatchStatControllerIT {
     private MatchStatRequest buildValidRequest(String matchId) {
         StatsDto stats = new StatsDto(10, 5, 2, 3, 1, 2, 15);
 
-        TimelineEntryDto event1 = new TimelineEntryDto(1, 0, 7L, "ace");
-        TimelineEntryDto event2 = new TimelineEntryDto(1, 1, null, "error");
+        TimelineEntryDto event1 = new TimelineEntryDto(1, 0, 7L, "ace", Instant.now());
+        TimelineEntryDto event2 = new TimelineEntryDto(1, 1, null, "error", Instant.now());
 
         SetStatDto set1 = new SetStatDto(1, 25, 20, stats, List.of(event1, event2));
         SetStatDto set2 = new SetStatDto(2, 25, 18, stats, List.of());
