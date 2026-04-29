@@ -2,7 +2,7 @@ package vasconcelos.silvio.volleymatch.dto.player;
 
 import java.util.List;
 
-public record CreatePlayerRequest(
+public record UpdatePlayerRequest(
         String name,
         String role,
         Integer numero,

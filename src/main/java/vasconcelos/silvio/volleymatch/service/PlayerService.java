@@ -3,9 +3,9 @@ package vasconcelos.silvio.volleymatch.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import vasconcelos.silvio.volleymatch.dto.player.AssignTeamRequest;
 import vasconcelos.silvio.volleymatch.dto.player.CreatePlayerRequest;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerDto;
+import vasconcelos.silvio.volleymatch.dto.player.UpdatePlayerRequest;
 import vasconcelos.silvio.volleymatch.mapper.PlayerMapper;
 import vasconcelos.silvio.volleymatch.model.player.Player;
 import vasconcelos.silvio.volleymatch.model.team.Team;
@@ -14,6 +14,8 @@ import vasconcelos.silvio.volleymatch.repository.TeamRepository;
 
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -38,8 +40,46 @@ public class PlayerService {
 
     @Transactional
     public PlayerDto createPlayer(CreatePlayerRequest request) {
-        Player saved = playerRepository.save(playerMapper.toEntity(request));
-        return playerMapper.toDto(saved);
+        Player player = playerMapper.toEntity(request);
+        if (request.teamIds() != null && !request.teamIds().isEmpty()) {
+            List<Team> teams = teamRepository.findAllById(request.teamIds());
+            if (teams.size() != request.teamIds().size()) {
+                throw new NoSuchElementException("One or more teams not found");
+            }
+            teams.forEach(player::addTeam);
+        }
+        return playerMapper.toDto(playerRepository.save(player));
+    }
+
+    @Transactional
+    public PlayerDto updatePlayer(Long id, UpdatePlayerRequest request) {
+        Player player = playerRepository.findById(id)
+                .orElseThrow(() -> new NoSuchElementException("Player not found: " + id));
+        if (request.name() != null && !request.name().equals(player.getName())) player.setName(request.name());
+        if (request.role() != null && !request.role().equals(player.getRole())) player.setRole(request.role());
+        if (request.numero() != null && !request.numero().equals(player.getNumero()))
+            player.setNumero(request.numero());
+        if (request.age() != null && !request.age().equals(player.getAge())) player.setAge(request.age());
+        if (request.taille() != null && !request.taille().equals(player.getTaille()))
+            player.setTaille(request.taille());
+        if (request.teamIds() != null) {
+            List<Team> newTeams = teamRepository.findAllById(request.teamIds());
+            if (newTeams.size() != request.teamIds().size()) {
+                throw new NoSuchElementException("One or more teams not found");
+            }
+            Set<Long> newIds = newTeams.stream().map(Team::getId).collect(Collectors.toSet());
+            Set<Long> currentIds = player.getTeams().stream().map(Team::getId).collect(Collectors.toSet());
+
+            player.getTeams().stream()
+                    .filter(t -> !newIds.contains(t.getId()))
+                    .toList()
+                    .forEach(player::removeTeam);
+
+            newTeams.stream()
+                    .filter(t -> !currentIds.contains(t.getId()))
+                    .forEach(player::addTeam);
+        }
+        return playerMapper.toDto(player);
     }
 
     @Transactional
@@ -48,25 +88,5 @@ public class PlayerService {
             throw new NoSuchElementException("Player not found: " + id);
         }
         playerRepository.deleteById(id);
-    }
-
-    @Transactional
-    public PlayerDto assignTeam(Long playerId, AssignTeamRequest request) {
-        Player player = playerRepository.findById(playerId)
-                .orElseThrow(() -> new NoSuchElementException("Player not found: " + playerId));
-        Team team = teamRepository.findById(request.teamId())
-                .orElseThrow(() -> new NoSuchElementException("Team not found: " + request.teamId()));
-        player.addTeam(team);
-        return playerMapper.toDto(player);
-    }
-
-    @Transactional
-    public PlayerDto removeTeam(Long playerId, Long teamId) {
-        Player player = playerRepository.findById(playerId)
-                .orElseThrow(() -> new NoSuchElementException("Player not found: " + playerId));
-        Team team = teamRepository.findById(teamId)
-                .orElseThrow(() -> new NoSuchElementException("Team not found: " + teamId));
-        player.removeTeam(team);
-        return playerMapper.toDto(player);
     }
 }

@@ -3,17 +3,11 @@ package vasconcelos.silvio.volleymatch.controller;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 import vasconcelos.silvio.volleymatch.dto.common.ApiResponse;
-import vasconcelos.silvio.volleymatch.dto.player.AssignTeamRequest;
 import vasconcelos.silvio.volleymatch.dto.player.CreatePlayerRequest;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerDto;
+import vasconcelos.silvio.volleymatch.dto.player.UpdatePlayerRequest;
 import vasconcelos.silvio.volleymatch.service.PlayerService;
 
 import java.util.List;
@@ -56,26 +50,14 @@ public class PlayerController {
                         .build());
     }
 
-    @PostMapping("/{id}:assignTeam")
-    public ResponseEntity<ApiResponse<PlayerDto>> assignTeam(
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<PlayerDto>> updatePlayer(
             @PathVariable Long id,
-            @RequestBody AssignTeamRequest request) {
-        PlayerDto updated = playerService.assignTeam(id, request);
+            @RequestBody UpdatePlayerRequest request) {
+        PlayerDto updated = playerService.updatePlayer(id, request);
         return ResponseEntity.ok(ApiResponse.<PlayerDto>builder()
                 .data(updated)
-                .message("Team assigned successfully")
-                .status(HttpStatus.OK.value())
-                .build());
-    }
-
-    @PostMapping("/{id}:removeTeam")
-    public ResponseEntity<ApiResponse<PlayerDto>> removeTeam(
-            @PathVariable Long id,
-            @RequestBody AssignTeamRequest request) {
-        PlayerDto updated = playerService.removeTeam(id, request.teamId());
-        return ResponseEntity.ok(ApiResponse.<PlayerDto>builder()
-                .data(updated)
-                .message("Team removed successfully")
+                .message("Player updated successfully")
                 .status(HttpStatus.OK.value())
                 .build());
     }

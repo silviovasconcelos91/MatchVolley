@@ -10,10 +10,12 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.Table;
+import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import vasconcelos.silvio.volleymatch.model.team.Team;
 
 import java.util.ArrayList;
@@ -22,6 +24,7 @@ import java.util.List;
 @Entity
 @Table(name = "players")
 @Getter
+@Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
@@ -29,6 +32,7 @@ public class Player {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Setter(AccessLevel.NONE)
     private Long id;
 
     @Column(name = "name", nullable = false)
@@ -53,6 +57,7 @@ public class Player {
             inverseJoinColumns = @JoinColumn(name = "team_id")
     )
     @Builder.Default
+    @Setter(AccessLevel.NONE)
     private List<Team> teams = new ArrayList<>();
 
     public void addTeam(Team team) {
