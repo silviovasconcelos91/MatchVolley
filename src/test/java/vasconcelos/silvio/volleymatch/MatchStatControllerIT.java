@@ -4,10 +4,13 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.resttestclient.TestRestTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import vasconcelos.silvio.volleymatch.dto.common.ApiResponse;
+import vasconcelos.silvio.volleymatch.dto.match.MatchDetailResponse;
 import vasconcelos.silvio.volleymatch.dto.match.MatchDto;
 import vasconcelos.silvio.volleymatch.dto.match.MatchStatRequest;
 import vasconcelos.silvio.volleymatch.dto.match.MetaDto;
@@ -65,6 +68,57 @@ class MatchStatControllerIT {
 
         Match saved = matchRepository.findById("match-003").orElseThrow();
         assertThat(saved.getSets().get(0).getTimeline()).hasSize(2);
+    }
+
+    @Test
+    void should_return200AndMatchDetail_when_matchExists() {
+        restTemplate.postForEntity("/api/v1/match-stats", buildValidRequest("match-get-001"), ApiResponse.class);
+
+        ResponseEntity<ApiResponse<MatchDetailResponse>> response = restTemplate.exchange(
+                "/api/v1/match-stats/match-get-001",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<>() {});
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        MatchDetailResponse data = response.getBody().data();
+        assertThat(data.id()).isEqualTo("match-get-001");
+        assertThat(data.result()).isEqualTo("WIN");
+        assertThat(data.teamMatchStats()).isNotNull();
+        assertThat(data.teamMatchStats().points()).isEqualTo(10);
+        assertThat(data.sets()).hasSize(2);
+        assertThat(data.players()).hasSize(1);
+    }
+
+    @Test
+    void should_return404_when_matchDoesNotExist() {
+        ResponseEntity<ApiResponse> response = restTemplate.getForEntity(
+                "/api/v1/match-stats/unknown-match-id", ApiResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    @Test
+    void should_returnSetScoresAndPlayerSetStats_when_matchExists() {
+        restTemplate.postForEntity("/api/v1/match-stats", buildValidRequest("match-get-002"), ApiResponse.class);
+
+        ResponseEntity<ApiResponse<MatchDetailResponse>> response = restTemplate.exchange(
+                "/api/v1/match-stats/match-get-002",
+                HttpMethod.GET,
+                null,
+                new ParameterizedTypeReference<>() {});
+
+        MatchDetailResponse data = response.getBody().data();
+
+        assertThat(data.sets().get(0).myScore()).isEqualTo(25);
+        assertThat(data.sets().get(0).oppScore()).isEqualTo(20);
+        assertThat(data.sets().get(0).teamStats()).isNotNull();
+
+        PlayerStatDto player = data.players().get(0);
+        assertThat(player.matchStats()).isNotNull();
+        assertThat(player.setStats()).hasSize(1);
+        assertThat(player.setStats().get(0).set()).isEqualTo(1);
+        assertThat(player.setStats().get(0).points()).isEqualTo(5);
     }
 
     private MatchStatRequest buildValidRequest(String matchId) {

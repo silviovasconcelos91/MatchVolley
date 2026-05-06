@@ -4,6 +4,7 @@ import org.mapstruct.AfterMapping;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
+import vasconcelos.silvio.volleymatch.dto.match.MatchDetailResponse;
 import vasconcelos.silvio.volleymatch.dto.match.MatchStatRequest;
 import vasconcelos.silvio.volleymatch.dto.match.PlayerSetStatDto;
 import vasconcelos.silvio.volleymatch.dto.match.PlayerStatDto;
@@ -35,17 +36,25 @@ public interface MatchStatMapper {
 
     VolleyStats toVolleyStats(StatsDto dto);
 
+    StatsDto toStatsDto(VolleyStats stats);
+
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "match", ignore = true)
     @Mapping(target = "teamStats", source = "teamStats")
     @Mapping(target = "timeline", source = "timeline")
     SetStat toSetStatEntity(SetStatDto dto);
 
+    @Mapping(target = "teamStats", source = "teamStats")
+    SetStatDto toSetStatDto(SetStat setStat);
+
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "match", ignore = true)
     @Mapping(target = "matchStats", source = "matchStats")
     @Mapping(target = "setStats", source = "setStats")
     PlayerMatchStat toPlayerMatchStatEntity(PlayerStatDto dto);
+
+    @Mapping(target = "matchStats", source = "matchStats")
+    PlayerStatDto toPlayerStatDto(PlayerMatchStat playerMatchStat);
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "set", source = "set")
@@ -58,6 +67,21 @@ public interface MatchStatMapper {
     @Mapping(target = "stats.serviceErrors", source = "serviceErrors")
     @Mapping(target = "stats.receptions", source = "receptions")
     PlayerSetStat toPlayerSetStatEntity(PlayerSetStatDto dto);
+
+    @Mapping(target = "points", source = "stats.points")
+    @Mapping(target = "attackPoints", source = "stats.attackPoints")
+    @Mapping(target = "blockPoints", source = "stats.blockPoints")
+    @Mapping(target = "acePoints", source = "stats.acePoints")
+    @Mapping(target = "attackErrors", source = "stats.attackErrors")
+    @Mapping(target = "serviceErrors", source = "stats.serviceErrors")
+    @Mapping(target = "receptions", source = "stats.receptions")
+    PlayerSetStatDto toPlayerSetStatDto(PlayerSetStat playerSetStat);
+
+    @Mapping(target = "result", expression = "java(match.getResult() != null ? match.getResult().name() : null)")
+    @Mapping(target = "teamMatchStats", source = "teamMatchStats")
+    @Mapping(target = "sets", source = "sets")
+    @Mapping(target = "players", source = "players")
+    MatchDetailResponse toMatchDetailResponse(Match match);
 
     default MatchResult toMatchResult(String result) {
         if (result == null) return null;

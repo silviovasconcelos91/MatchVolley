@@ -58,6 +58,7 @@ config/       → config Spring
 - Réponse structurée : `{ data, message, status }`
 
 **Tests**
+- Toujours implémenter des tests unitaire
 - JUnit 5 + AssertJ pour assertions
 - `@SpringBootTest` pour intégration
 - Nommage : `should_[résultat]_when_[condition]`
