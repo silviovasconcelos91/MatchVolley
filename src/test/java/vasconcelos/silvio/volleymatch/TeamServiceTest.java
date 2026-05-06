@@ -5,17 +5,23 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import vasconcelos.silvio.volleymatch.dto.match.MatchDto;
 import vasconcelos.silvio.volleymatch.dto.team.AssignPlayersRequest;
 import vasconcelos.silvio.volleymatch.dto.team.CreateTeamRequest;
 import vasconcelos.silvio.volleymatch.dto.team.RemovePlayersRequest;
 import vasconcelos.silvio.volleymatch.dto.team.TeamDto;
+import vasconcelos.silvio.volleymatch.mapper.MatchStatMapper;
 import vasconcelos.silvio.volleymatch.mapper.TeamMapper;
+import vasconcelos.silvio.volleymatch.model.match.Match;
+import vasconcelos.silvio.volleymatch.model.match.MatchResult;
 import vasconcelos.silvio.volleymatch.model.player.Player;
 import vasconcelos.silvio.volleymatch.model.team.Team;
+import vasconcelos.silvio.volleymatch.repository.MatchRepository;
 import vasconcelos.silvio.volleymatch.repository.PlayerRepository;
 import vasconcelos.silvio.volleymatch.repository.TeamRepository;
 import vasconcelos.silvio.volleymatch.service.TeamService;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -35,10 +41,53 @@ class TeamServiceTest {
     private PlayerRepository playerRepository;
 
     @Mock
+    private MatchRepository matchRepository;
+
+    @Mock
     private TeamMapper teamMapper;
+
+    @Mock
+    private MatchStatMapper matchStatMapper;
 
     @InjectMocks
     private TeamService teamService;
+
+    @Test
+    void should_returnMatches_when_teamExists() {
+        Match match = Match.builder()
+                .id("match-1").teamId(1L).date(LocalDate.of(2025, 10, 5))
+                .result(MatchResult.WON).mySets(3).oppSets(1).build();
+        MatchDto dto = new MatchDto("match-1", 1L, null, "2025/2026", null,
+                LocalDate.of(2025, 10, 5), "WIN", 3, 1);
+        when(teamRepository.existsById(1L)).thenReturn(true);
+        when(matchRepository.findByTeamId(1L)).thenReturn(List.of(match));
+        when(matchStatMapper.toMatchDto(match)).thenReturn(dto);
+
+        List<MatchDto> result = teamService.getMatchesByTeam(1L);
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).id()).isEqualTo("match-1");
+        assertThat(result.get(0).result()).isEqualTo("WIN");
+    }
+
+    @Test
+    void should_returnEmptyList_when_teamHasNoMatches() {
+        when(teamRepository.existsById(2L)).thenReturn(true);
+        when(matchRepository.findByTeamId(2L)).thenReturn(List.of());
+
+        List<MatchDto> result = teamService.getMatchesByTeam(2L);
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void should_throwNoSuchElementException_when_getMatchesByTeamNotFound() {
+        when(teamRepository.existsById(99L)).thenReturn(false);
+
+        assertThatThrownBy(() -> teamService.getMatchesByTeam(99L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("99");
+    }
 
     @Test
     void should_returnAllTeams_when_getAllTeams() {

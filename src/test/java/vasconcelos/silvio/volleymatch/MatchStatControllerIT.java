@@ -83,7 +83,7 @@ class MatchStatControllerIT {
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         MatchDetailResponse data = response.getBody().data();
         assertThat(data.id()).isEqualTo("match-get-001");
-        assertThat(data.result()).isEqualTo("WIN");
+        assertThat(data.result()).isEqualTo("WON");
         assertThat(data.teamMatchStats()).isNotNull();
         assertThat(data.teamMatchStats().points()).isEqualTo(10);
         assertThat(data.sets()).hasSize(2);
@@ -130,12 +130,12 @@ class MatchStatControllerIT {
         SetStatDto set1 = new SetStatDto(1, 25, 20, stats, List.of(event1, event2));
         SetStatDto set2 = new SetStatDto(2, 25, 18, stats, List.of());
 
-        PlayerSetStatDto playerSetStat = new PlayerSetStatDto(1, 5, 3, 1, 1, 0, 1, 8);
+        PlayerSetStatDto playerSetStat = new PlayerSetStatDto(1, "Libero", 5, 3, 1, 1, 0, 1, 8);
         PlayerStatDto player = new PlayerStatDto(42L, 7, "libero", stats, List.of(playerSetStat));
 
         MatchDto matchDto = new MatchDto(
                 matchId, 1L, 2L, "2025-2026", 10L,
-                LocalDate.of(2026, 3, 15), "win", 2, 0
+                LocalDate.of(2026, 3, 15), "WON", 2, 0
         );
 
         MetaDto meta = new MetaDto(Instant.now(), "1.0.0");

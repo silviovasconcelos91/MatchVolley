@@ -5,6 +5,7 @@ import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
 import org.mapstruct.MappingTarget;
 import vasconcelos.silvio.volleymatch.dto.match.MatchDetailResponse;
+import vasconcelos.silvio.volleymatch.dto.match.MatchDto;
 import vasconcelos.silvio.volleymatch.dto.match.MatchStatRequest;
 import vasconcelos.silvio.volleymatch.dto.match.PlayerSetStatDto;
 import vasconcelos.silvio.volleymatch.dto.match.PlayerStatDto;
@@ -15,6 +16,7 @@ import vasconcelos.silvio.volleymatch.model.match.MatchResult;
 import vasconcelos.silvio.volleymatch.model.match.PlayerMatchStat;
 import vasconcelos.silvio.volleymatch.model.match.PlayerSetStat;
 import vasconcelos.silvio.volleymatch.model.match.SetStat;
+import vasconcelos.silvio.volleymatch.model.match.VolleyPosition;
 import vasconcelos.silvio.volleymatch.model.match.VolleyStats;
 
 @Mapper(componentModel = "spring")
@@ -58,6 +60,7 @@ public interface MatchStatMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "set", source = "set")
+    @Mapping(target = "position", expression = "java(toVolleyPosition(dto.position()))")
     @Mapping(target = "playerMatchStat", ignore = true)
     @Mapping(target = "stats.points", source = "points")
     @Mapping(target = "stats.attackPoints", source = "attackPoints")
@@ -68,6 +71,7 @@ public interface MatchStatMapper {
     @Mapping(target = "stats.receptions", source = "receptions")
     PlayerSetStat toPlayerSetStatEntity(PlayerSetStatDto dto);
 
+    @Mapping(target = "position", expression = "java(playerSetStat.getPosition() != null ? playerSetStat.getPosition().name() : null)")
     @Mapping(target = "points", source = "stats.points")
     @Mapping(target = "attackPoints", source = "stats.attackPoints")
     @Mapping(target = "blockPoints", source = "stats.blockPoints")
@@ -78,6 +82,9 @@ public interface MatchStatMapper {
     PlayerSetStatDto toPlayerSetStatDto(PlayerSetStat playerSetStat);
 
     @Mapping(target = "result", expression = "java(match.getResult() != null ? match.getResult().name() : null)")
+    MatchDto toMatchDto(Match match);
+
+    @Mapping(target = "result", expression = "java(match.getResult() != null ? match.getResult().name() : null)")
     @Mapping(target = "teamMatchStats", source = "teamMatchStats")
     @Mapping(target = "sets", source = "sets")
     @Mapping(target = "players", source = "players")
@@ -86,6 +93,14 @@ public interface MatchStatMapper {
     default MatchResult toMatchResult(String result) {
         if (result == null) return null;
         return MatchResult.valueOf(result.toUpperCase());
+    }
+
+    default VolleyPosition toVolleyPosition(String position) {
+        if (position == null) return null;
+        for (VolleyPosition p : VolleyPosition.values()) {
+            if (p.name().equalsIgnoreCase(position)) return p;
+        }
+        throw new IllegalArgumentException("Unknown position: " + position);
     }
 
     @AfterMapping

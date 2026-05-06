@@ -5,6 +5,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import vasconcelos.silvio.volleymatch.dto.common.ApiResponse;
+import vasconcelos.silvio.volleymatch.dto.match.MatchDto;
 import vasconcelos.silvio.volleymatch.dto.team.AssignPlayersRequest;
 import vasconcelos.silvio.volleymatch.dto.team.CreateTeamRequest;
 import vasconcelos.silvio.volleymatch.dto.team.RemovePlayersRequest;
@@ -50,6 +51,16 @@ TeamController {
                         .message("Team created successfully")
                         .status(HttpStatus.CREATED.value())
                         .build());
+    }
+
+    @GetMapping("/{id}/matches")
+    public ResponseEntity<ApiResponse<List<MatchDto>>> getTeamMatches(@PathVariable Long id) {
+        List<MatchDto> matches = teamService.getMatchesByTeam(id);
+        return ResponseEntity.ok(ApiResponse.<List<MatchDto>>builder()
+                .data(matches)
+                .message("Team matches retrieved successfully")
+                .status(HttpStatus.OK.value())
+                .build());
     }
 
     @PostMapping("/{id}:assignPlayers")

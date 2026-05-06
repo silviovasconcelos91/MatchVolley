@@ -3,6 +3,8 @@ package vasconcelos.silvio.volleymatch.model.match;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -35,6 +37,10 @@ public class PlayerSetStat {
 
     @Column(name = "set_num", nullable = false)
     private Integer set;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "position", length = 20)
+    private VolleyPosition position;
 
     @Embedded
     private VolleyStats stats;
