@@ -9,6 +9,8 @@ public record MatchDetailResponse(
         Long opponentId,
         String seasonId,
         Long competitionId,
+        String title,
+        Boolean home,
         LocalDate date,
         String result,
         Integer mySets,

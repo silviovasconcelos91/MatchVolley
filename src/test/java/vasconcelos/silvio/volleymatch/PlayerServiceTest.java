@@ -5,11 +5,18 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import vasconcelos.silvio.volleymatch.dto.match.StatsDto;
 import vasconcelos.silvio.volleymatch.dto.player.CreatePlayerRequest;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerDto;
+import vasconcelos.silvio.volleymatch.dto.player.PlayerSeasonStatsResponse;
 import vasconcelos.silvio.volleymatch.dto.player.UpdatePlayerRequest;
 import vasconcelos.silvio.volleymatch.mapper.PlayerMapper;
+import vasconcelos.silvio.volleymatch.model.match.PlayerMatchStat;
+import vasconcelos.silvio.volleymatch.model.match.PlayerSetStat;
+import vasconcelos.silvio.volleymatch.model.match.VolleyPosition;
+import vasconcelos.silvio.volleymatch.model.match.VolleyStats;
 import vasconcelos.silvio.volleymatch.model.player.Player;
+import vasconcelos.silvio.volleymatch.repository.PlayerMatchStatRepository;
 import vasconcelos.silvio.volleymatch.repository.PlayerRepository;
 import vasconcelos.silvio.volleymatch.repository.TeamRepository;
 import vasconcelos.silvio.volleymatch.service.PlayerService;
@@ -30,10 +37,61 @@ class PlayerServiceTest {
     private PlayerRepository playerRepository;
 
     @Mock
+    private TeamRepository teamRepository;
+
+    @Mock
+    private PlayerMatchStatRepository playerMatchStatRepository;
+
+    @Mock
     private PlayerMapper playerMapper;
 
     @InjectMocks
     private PlayerService playerService;
+
+    @Test
+    void should_returnSeasonStats_when_playerHasMatches() {
+        VolleyStats stats = new VolleyStats(10, 5, 2, 3, 1, 1, 8);
+        PlayerSetStat setStat = PlayerSetStat.builder()
+                .set(1).position(VolleyPosition.Libero).stats(stats).build();
+        PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 42L, 7, "libero", stats, List.of(setStat));
+        when(playerRepository.existsById(42L)).thenReturn(true);
+        when(playerMatchStatRepository.findByPlayerId(42L)).thenReturn(List.of(matchStat));
+
+        PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(42L);
+
+        assertThat(result.playerId()).isEqualTo(42L);
+        assertThat(result.matchCount()).isEqualTo(1);
+        assertThat(result.totalStats().points()).isEqualTo(10);
+        assertThat(result.statsByPosition()).containsKey("Libero");
+        assertThat(result.statsByPosition().get("Libero").points()).isEqualTo(10);
+    }
+
+    @Test
+    void should_aggregateStatsByPosition_when_playerHasMultiplePositions() {
+        VolleyStats liberoStats = new VolleyStats(5, 0, 0, 0, 0, 0, 10);
+        VolleyStats r4Stats = new VolleyStats(8, 4, 1, 3, 1, 1, 2);
+        PlayerSetStat liberoSet = PlayerSetStat.builder().set(1).position(VolleyPosition.Libero).stats(liberoStats).build();
+        PlayerSetStat r4Set = PlayerSetStat.builder().set(2).position(VolleyPosition.R4).stats(r4Stats).build();
+        VolleyStats matchTotal = new VolleyStats(13, 4, 1, 3, 1, 1, 12);
+        PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 1L, 7, "libero", matchTotal, List.of(liberoSet, r4Set));
+        when(playerRepository.existsById(1L)).thenReturn(true);
+        when(playerMatchStatRepository.findByPlayerId(1L)).thenReturn(List.of(matchStat));
+
+        PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(1L);
+
+        assertThat(result.statsByPosition()).hasSize(2);
+        assertThat(result.statsByPosition().get("Libero").receptions()).isEqualTo(10);
+        assertThat(result.statsByPosition().get("R4").attackPoints()).isEqualTo(4);
+    }
+
+    @Test
+    void should_throwNoSuchElementException_when_getSeasonStatsPlayerNotFound() {
+        when(playerRepository.existsById(99L)).thenReturn(false);
+
+        assertThatThrownBy(() -> playerService.getPlayerSeasonStats(99L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("99");
+    }
 
     @Test
     void should_returnAllPlayers_when_getAllPlayers() {

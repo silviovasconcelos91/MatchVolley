@@ -58,7 +58,7 @@ class MatchStatServiceTest {
                 .mySets(3).oppSets(0).result(vasconcelos.silvio.volleymatch.model.match.MatchResult.WON)
                 .build();
         MatchDetailResponse expected = new MatchDetailResponse(
-                "match-unit-02", 1L, null, null, null, LocalDate.now(), "WIN", 3, 0, null, List.of(), List.of());
+                "match-unit-02", 1L, null, null, null, null, null, LocalDate.now(), "WON", 3, 0, null, List.of(), List.of());
         when(matchRepository.findById("match-unit-02")).thenReturn(Optional.of(match));
         when(matchStatMapper.toMatchDetailResponse(match)).thenReturn(expected);
 

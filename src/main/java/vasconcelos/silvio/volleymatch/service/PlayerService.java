@@ -3,16 +3,23 @@ package vasconcelos.silvio.volleymatch.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vasconcelos.silvio.volleymatch.dto.match.StatsDto;
 import vasconcelos.silvio.volleymatch.dto.player.CreatePlayerRequest;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerDto;
+import vasconcelos.silvio.volleymatch.dto.player.PlayerSeasonStatsResponse;
 import vasconcelos.silvio.volleymatch.dto.player.UpdatePlayerRequest;
 import vasconcelos.silvio.volleymatch.mapper.PlayerMapper;
+import vasconcelos.silvio.volleymatch.model.match.PlayerMatchStat;
+import vasconcelos.silvio.volleymatch.model.match.PlayerSetStat;
+import vasconcelos.silvio.volleymatch.model.match.VolleyStats;
 import vasconcelos.silvio.volleymatch.model.player.Player;
 import vasconcelos.silvio.volleymatch.model.team.Team;
+import vasconcelos.silvio.volleymatch.repository.PlayerMatchStatRepository;
 import vasconcelos.silvio.volleymatch.repository.PlayerRepository;
 import vasconcelos.silvio.volleymatch.repository.TeamRepository;
 
 import java.util.List;
+import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -24,7 +31,44 @@ public class PlayerService {
 
     private final PlayerRepository playerRepository;
     private final TeamRepository teamRepository;
+    private final PlayerMatchStatRepository playerMatchStatRepository;
     private final PlayerMapper playerMapper;
+
+    public PlayerSeasonStatsResponse getPlayerSeasonStats(Long playerId) {
+        if (!playerRepository.existsById(playerId)) {
+            throw new NoSuchElementException("Player not found: " + playerId);
+        }
+        List<PlayerMatchStat> matchStats = playerMatchStatRepository.findByPlayerId(playerId);
+
+        StatsDto total = sumVolleyStats(
+                matchStats.stream().map(PlayerMatchStat::getMatchStats).toList()
+        );
+
+        Map<String, StatsDto> byPosition = matchStats.stream()
+                .flatMap(m -> m.getSetStats().stream())
+                .filter(s -> s.getPosition() != null)
+                .collect(Collectors.groupingBy(
+                        s -> s.getPosition().name(),
+                        Collectors.collectingAndThen(
+                                Collectors.toList(),
+                                list -> sumVolleyStats(list.stream().map(PlayerSetStat::getStats).toList())
+                        )
+                ));
+
+        return new PlayerSeasonStatsResponse(playerId, matchStats.size(), total, byPosition);
+    }
+
+    private StatsDto sumVolleyStats(List<VolleyStats> statsList) {
+        return new StatsDto(
+                statsList.stream().mapToInt(s -> s.getPoints() != null ? s.getPoints() : 0).sum(),
+                statsList.stream().mapToInt(s -> s.getAttackPoints() != null ? s.getAttackPoints() : 0).sum(),
+                statsList.stream().mapToInt(s -> s.getBlockPoints() != null ? s.getBlockPoints() : 0).sum(),
+                statsList.stream().mapToInt(s -> s.getAcePoints() != null ? s.getAcePoints() : 0).sum(),
+                statsList.stream().mapToInt(s -> s.getAttackErrors() != null ? s.getAttackErrors() : 0).sum(),
+                statsList.stream().mapToInt(s -> s.getServiceErrors() != null ? s.getServiceErrors() : 0).sum(),
+                statsList.stream().mapToInt(s -> s.getReceptions() != null ? s.getReceptions() : 0).sum()
+        );
+    }
 
     public List<PlayerDto> getAllPlayers() {
         return playerRepository.findAll().stream()

@@ -1,0 +1,3 @@
+ALTER TABLE matches
+    ADD COLUMN title VARCHAR(255),
+    ADD COLUMN home  BOOLEAN;

@@ -42,6 +42,12 @@ public class Match {
     @Column(name = "competition_id")
     private Long competitionId = 1L;
 
+    @Column(name = "title")
+    private String title;
+
+    @Column(name = "home")
+    private Boolean home;
+
     @Column(name = "date", nullable = false)
     private LocalDate date;
 

@@ -135,6 +135,7 @@ class MatchStatControllerIT {
 
         MatchDto matchDto = new MatchDto(
                 matchId, 1L, 2L, "2025-2026", 10L,
+                "Finale Coupe", true,
                 LocalDate.of(2026, 3, 15), "WON", 2, 0
         );
 

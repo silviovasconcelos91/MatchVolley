@@ -27,6 +27,8 @@ public interface MatchStatMapper {
     @Mapping(target = "opponentId", source = "match.opponentId")
     @Mapping(target = "seasonId", source = "match.seasonId")
     @Mapping(target = "competitionId", source = "match.competitionId")
+    @Mapping(target = "title", source = "match.title")
+    @Mapping(target = "home", source = "match.home")
     @Mapping(target = "date", source = "match.date")
     @Mapping(target = "result", source = "match.result")
     @Mapping(target = "mySets", source = "match.mySets")

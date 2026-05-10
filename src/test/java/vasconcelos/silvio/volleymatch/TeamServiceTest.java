@@ -58,7 +58,7 @@ class TeamServiceTest {
                 .id("match-1").teamId(1L).date(LocalDate.of(2025, 10, 5))
                 .result(MatchResult.WON).mySets(3).oppSets(1).build();
         MatchDto dto = new MatchDto("match-1", 1L, null, "2025/2026", null,
-                LocalDate.of(2025, 10, 5), "WIN", 3, 1);
+                null, null, LocalDate.of(2025, 10, 5), "WON", 3, 1);
         when(teamRepository.existsById(1L)).thenReturn(true);
         when(matchRepository.findByTeamId(1L)).thenReturn(List.of(match));
         when(matchStatMapper.toMatchDto(match)).thenReturn(dto);
@@ -67,7 +67,7 @@ class TeamServiceTest {
 
         assertThat(result).hasSize(1);
         assertThat(result.get(0).id()).isEqualTo("match-1");
-        assertThat(result.get(0).result()).isEqualTo("WIN");
+        assertThat(result.get(0).result()).isEqualTo("WON");
     }
 
     @Test

@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import vasconcelos.silvio.volleymatch.dto.common.ApiResponse;
 import vasconcelos.silvio.volleymatch.dto.player.CreatePlayerRequest;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerDto;
+import vasconcelos.silvio.volleymatch.dto.player.PlayerSeasonStatsResponse;
 import vasconcelos.silvio.volleymatch.dto.player.UpdatePlayerRequest;
 import vasconcelos.silvio.volleymatch.service.PlayerService;
 
@@ -35,6 +36,16 @@ public class PlayerController {
         return ResponseEntity.ok(ApiResponse.<PlayerDto>builder()
                 .data(player)
                 .message("Player retrieved successfully")
+                .status(HttpStatus.OK.value())
+                .build());
+    }
+
+    @GetMapping("/{id}/season-stats")
+    public ResponseEntity<ApiResponse<PlayerSeasonStatsResponse>> getPlayerSeasonStats(@PathVariable Long id) {
+        PlayerSeasonStatsResponse stats = playerService.getPlayerSeasonStats(id);
+        return ResponseEntity.ok(ApiResponse.<PlayerSeasonStatsResponse>builder()
+                .data(stats)
+                .message("Player season stats retrieved successfully")
                 .status(HttpStatus.OK.value())
                 .build());
     }
