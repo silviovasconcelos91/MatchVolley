@@ -65,7 +65,7 @@ class MatchStatServiceTest {
         MatchDetailResponse result = matchStatService.getMatchStat("match-unit-02");
 
         assertThat(result.id()).isEqualTo("match-unit-02");
-        assertThat(result.result()).isEqualTo("WIN");
+        assertThat(result.result()).isEqualTo("WON");
     }
 
     @Test

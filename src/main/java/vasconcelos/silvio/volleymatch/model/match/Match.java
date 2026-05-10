@@ -33,12 +33,15 @@ public class Match {
     @Column(name = "team_id", nullable = false)
     private Long teamId;
 
+    @Builder.Default
     @Column(name = "opponent_id")
     private Long opponentId = 1L;
 
+    @Builder.Default
     @Column(name = "season_id")
     private String seasonId = "2025/2026";
 
+    @Builder.Default
     @Column(name = "competition_id")
     private Long competitionId = 1L;
 

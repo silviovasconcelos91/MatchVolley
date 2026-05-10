@@ -33,9 +33,6 @@ public interface MatchStatMapper {
     @Mapping(target = "result", source = "match.result")
     @Mapping(target = "mySets", source = "match.mySets")
     @Mapping(target = "oppSets", source = "match.oppSets")
-    @Mapping(target = "teamMatchStats", source = "teamMatchStats")
-    @Mapping(target = "sets", source = "sets")
-    @Mapping(target = "players", source = "players")
     Match toEntity(MatchStatRequest request);
 
     VolleyStats toVolleyStats(StatsDto dto);
@@ -44,8 +41,6 @@ public interface MatchStatMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "match", ignore = true)
-    @Mapping(target = "teamStats", source = "teamStats")
-    @Mapping(target = "timeline", source = "timeline")
     SetStat toSetStatEntity(SetStatDto dto);
 
     @Mapping(target = "teamStats", source = "teamStats")

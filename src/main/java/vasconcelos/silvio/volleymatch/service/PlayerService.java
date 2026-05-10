@@ -62,15 +62,18 @@ public class PlayerService {
     }
 
     private StatsDto sumVolleyStats(List<VolleyStats> statsList) {
-        return new StatsDto(
-                statsList.stream().mapToInt(s -> s.getPoints() != null ? s.getPoints() : 0).sum(),
-                statsList.stream().mapToInt(s -> s.getAttackPoints() != null ? s.getAttackPoints() : 0).sum(),
-                statsList.stream().mapToInt(s -> s.getBlockPoints() != null ? s.getBlockPoints() : 0).sum(),
-                statsList.stream().mapToInt(s -> s.getAcePoints() != null ? s.getAcePoints() : 0).sum(),
-                statsList.stream().mapToInt(s -> s.getAttackErrors() != null ? s.getAttackErrors() : 0).sum(),
-                statsList.stream().mapToInt(s -> s.getServiceErrors() != null ? s.getServiceErrors() : 0).sum(),
-                statsList.stream().mapToInt(s -> s.getReceptions() != null ? s.getReceptions() : 0).sum()
-        );
+        int points = 0, attackPoints = 0, blockPoints = 0, acePoints = 0;
+        int attackErrors = 0, serviceErrors = 0, receptions = 0;
+        for (VolleyStats s : statsList) {
+            if (s.getPoints() != null) points += s.getPoints();
+            if (s.getAttackPoints() != null) attackPoints += s.getAttackPoints();
+            if (s.getBlockPoints() != null) blockPoints += s.getBlockPoints();
+            if (s.getAcePoints() != null) acePoints += s.getAcePoints();
+            if (s.getAttackErrors() != null) attackErrors += s.getAttackErrors();
+            if (s.getServiceErrors() != null) serviceErrors += s.getServiceErrors();
+            if (s.getReceptions() != null) receptions += s.getReceptions();
+        }
+        return new StatsDto(points, attackPoints, blockPoints, acePoints, attackErrors, serviceErrors, receptions);
     }
 
     public List<PlayerDto> getAllPlayers() {
@@ -102,13 +105,11 @@ public class PlayerService {
     public PlayerDto updatePlayer(Long id, UpdatePlayerRequest request) {
         Player player = playerRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Player not found: " + id));
-        if (request.name() != null && !request.name().equals(player.getName())) player.setName(request.name());
-        if (request.role() != null && !request.role().equals(player.getRole())) player.setRole(request.role());
-        if (request.numero() != null && !request.numero().equals(player.getNumero()))
-            player.setNumero(request.numero());
-        if (request.age() != null && !request.age().equals(player.getAge())) player.setAge(request.age());
-        if (request.taille() != null && !request.taille().equals(player.getTaille()))
-            player.setTaille(request.taille());
+        if (request.name() != null) player.setName(request.name());
+        if (request.role() != null) player.setRole(request.role());
+        if (request.numero() != null) player.setNumero(request.numero());
+        if (request.age() != null) player.setAge(request.age());
+        if (request.taille() != null) player.setTaille(request.taille());
         if (request.teamIds() != null) {
             List<Team> newTeams = teamRepository.findAllById(request.teamIds());
             if (newTeams.size() != request.teamIds().size()) {
