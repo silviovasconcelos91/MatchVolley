@@ -34,11 +34,14 @@ public class PlayerService {
     private final PlayerMatchStatRepository playerMatchStatRepository;
     private final PlayerMapper playerMapper;
 
-    public PlayerSeasonStatsResponse getPlayerSeasonStats(Long playerId) {
+    public PlayerSeasonStatsResponse getPlayerSeasonStats(Long playerId, Long teamId) {
         if (!playerRepository.existsById(playerId)) {
             throw new NoSuchElementException("Player not found: " + playerId);
         }
-        List<PlayerMatchStat> matchStats = playerMatchStatRepository.findByPlayerId(playerId);
+        if (!teamRepository.existsById(teamId)) {
+            throw new NoSuchElementException("Team not found: " + teamId);
+        }
+        List<PlayerMatchStat> matchStats = playerMatchStatRepository.findByPlayerIdAndMatchTeamId(playerId, teamId);
 
         StatsDto total = sumVolleyStats(
                 matchStats.stream().map(PlayerMatchStat::getMatchStats).toList()

@@ -55,9 +55,10 @@ class PlayerServiceTest {
                 .set(1).position(VolleyPosition.Libero).stats(stats).build();
         PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 42L, 7, "libero", stats, List.of(setStat));
         when(playerRepository.existsById(42L)).thenReturn(true);
-        when(playerMatchStatRepository.findByPlayerId(42L)).thenReturn(List.of(matchStat));
+        when(teamRepository.existsById(1L)).thenReturn(true);
+        when(playerMatchStatRepository.findByPlayerIdAndMatchTeamId(42L, 1L)).thenReturn(List.of(matchStat));
 
-        PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(42L);
+        PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(42L, 1L);
 
         assertThat(result.playerId()).isEqualTo(42L);
         assertThat(result.matchCount()).isEqualTo(1);
@@ -75,9 +76,10 @@ class PlayerServiceTest {
         VolleyStats matchTotal = new VolleyStats(13, 4, 1, 3, 1, 1, 12);
         PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 1L, 7, "libero", matchTotal, List.of(liberoSet, r4Set));
         when(playerRepository.existsById(1L)).thenReturn(true);
-        when(playerMatchStatRepository.findByPlayerId(1L)).thenReturn(List.of(matchStat));
+        when(teamRepository.existsById(2L)).thenReturn(true);
+        when(playerMatchStatRepository.findByPlayerIdAndMatchTeamId(1L, 2L)).thenReturn(List.of(matchStat));
 
-        PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(1L);
+        PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(1L, 2L);
 
         assertThat(result.statsByPosition()).hasSize(2);
         assertThat(result.statsByPosition().get("Libero").receptions()).isEqualTo(10);
@@ -88,7 +90,17 @@ class PlayerServiceTest {
     void should_throwNoSuchElementException_when_getSeasonStatsPlayerNotFound() {
         when(playerRepository.existsById(99L)).thenReturn(false);
 
-        assertThatThrownBy(() -> playerService.getPlayerSeasonStats(99L))
+        assertThatThrownBy(() -> playerService.getPlayerSeasonStats(99L, 1L))
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("99");
+    }
+
+    @Test
+    void should_throwNoSuchElementException_when_getSeasonStatsTeamNotFound() {
+        when(playerRepository.existsById(1L)).thenReturn(true);
+        when(teamRepository.existsById(99L)).thenReturn(false);
+
+        assertThatThrownBy(() -> playerService.getPlayerSeasonStats(1L, 99L))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("99");
     }

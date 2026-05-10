@@ -41,8 +41,10 @@ public class PlayerController {
     }
 
     @GetMapping("/{id}/season-stats")
-    public ResponseEntity<ApiResponse<PlayerSeasonStatsResponse>> getPlayerSeasonStats(@PathVariable Long id) {
-        PlayerSeasonStatsResponse stats = playerService.getPlayerSeasonStats(id);
+    public ResponseEntity<ApiResponse<PlayerSeasonStatsResponse>> getPlayerSeasonStats(
+            @PathVariable Long id,
+            @RequestParam Long teamId) {
+        PlayerSeasonStatsResponse stats = playerService.getPlayerSeasonStats(id, teamId);
         return ResponseEntity.ok(ApiResponse.<PlayerSeasonStatsResponse>builder()
                 .data(stats)
                 .message("Player season stats retrieved successfully")
