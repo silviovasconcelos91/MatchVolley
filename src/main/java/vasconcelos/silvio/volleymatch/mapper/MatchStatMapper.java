@@ -66,6 +66,7 @@ public interface MatchStatMapper {
     @Mapping(target = "stats.attackErrors", source = "attackErrors")
     @Mapping(target = "stats.serviceErrors", source = "serviceErrors")
     @Mapping(target = "stats.receptions", source = "receptions")
+    @Mapping(target = "stats.faults", source = "faults")
     PlayerSetStat toPlayerSetStatEntity(PlayerSetStatDto dto);
 
     @Mapping(target = "position", expression = "java(playerSetStat.getPosition() != null ? playerSetStat.getPosition().name() : null)")
@@ -76,6 +77,7 @@ public interface MatchStatMapper {
     @Mapping(target = "attackErrors", source = "stats.attackErrors")
     @Mapping(target = "serviceErrors", source = "stats.serviceErrors")
     @Mapping(target = "receptions", source = "stats.receptions")
+    @Mapping(target = "faults", source = "stats.faults")
     PlayerSetStatDto toPlayerSetStatDto(PlayerSetStat playerSetStat);
 
     @Mapping(target = "result", expression = "java(match.getResult() != null ? match.getResult().name() : null)")

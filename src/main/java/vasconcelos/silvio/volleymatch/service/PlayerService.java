@@ -73,7 +73,7 @@ public class PlayerService {
 
     private StatsDto sumVolleyStats(List<VolleyStats> statsList) {
         int points = 0, attackPoints = 0, blockPoints = 0, acePoints = 0;
-        int attackErrors = 0, serviceErrors = 0, receptions = 0;
+        int attackErrors = 0, serviceErrors = 0, receptions = 0, faults = 0;
         for (VolleyStats s : statsList) {
             if (s.getPoints() != null) points += s.getPoints();
             if (s.getAttackPoints() != null) attackPoints += s.getAttackPoints();
@@ -82,8 +82,9 @@ public class PlayerService {
             if (s.getAttackErrors() != null) attackErrors += s.getAttackErrors();
             if (s.getServiceErrors() != null) serviceErrors += s.getServiceErrors();
             if (s.getReceptions() != null) receptions += s.getReceptions();
+            if (s.getFaults() != null) faults += s.getFaults();
         }
-        return new StatsDto(points, attackPoints, blockPoints, acePoints, attackErrors, serviceErrors, receptions);
+        return new StatsDto(points, attackPoints, blockPoints, acePoints, attackErrors, serviceErrors, receptions, faults);
     }
 
     public List<PlayerDto> getAllPlayers() {

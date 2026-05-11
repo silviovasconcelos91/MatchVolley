@@ -49,7 +49,7 @@ class PlayerServiceTest {
 
     @Test
     void should_returnSeasonStats_when_playerHasMatches() {
-        VolleyStats stats = new VolleyStats(10, 5, 2, 3, 1, 1, 8);
+        VolleyStats stats = new VolleyStats(10, 5, 2, 3, 1, 1, 8, 2);
         PlayerSetStat setStat = PlayerSetStat.builder()
                 .set(1).position(VolleyPosition.Libero).stats(stats).build();
         PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 42L, 7, VolleyPosition.Libero, stats, List.of(setStat));
@@ -71,11 +71,11 @@ class PlayerServiceTest {
 
     @Test
     void should_aggregateStatsByPosition_when_playerHasMultiplePositions() {
-        VolleyStats liberoStats = new VolleyStats(5, 0, 0, 0, 0, 0, 10);
-        VolleyStats r4Stats = new VolleyStats(8, 4, 1, 3, 1, 1, 2);
+        VolleyStats liberoStats = new VolleyStats(5, 0, 0, 0, 0, 0, 10, 1);
+        VolleyStats r4Stats = new VolleyStats(8, 4, 1, 3, 1, 1, 2, 3);
         PlayerSetStat liberoSet = PlayerSetStat.builder().set(1).position(VolleyPosition.Libero).stats(liberoStats).build();
         PlayerSetStat r4Set = PlayerSetStat.builder().set(2).position(VolleyPosition.R4).stats(r4Stats).build();
-        VolleyStats matchTotal = new VolleyStats(13, 4, 1, 3, 1, 1, 12);
+        VolleyStats matchTotal = new VolleyStats(13, 4, 1, 3, 1, 1, 12, 4);
         PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 1L, 7, VolleyPosition.Libero, matchTotal, List.of(liberoSet, r4Set));
         when(playerRepository.existsById(1L)).thenReturn(true);
         when(teamRepository.existsById(2L)).thenReturn(true);

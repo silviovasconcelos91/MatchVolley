@@ -19,4 +19,5 @@ public class VolleyStats {
     private Integer attackErrors;
     private Integer serviceErrors;
     private Integer receptions;
+    private Integer faults;
 }

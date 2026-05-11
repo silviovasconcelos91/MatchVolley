@@ -7,5 +7,6 @@ public record StatsDto(
         Integer acePoints,
         Integer attackErrors,
         Integer serviceErrors,
-        Integer receptions
+        Integer receptions,
+        Integer faults
 ) {}

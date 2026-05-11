@@ -123,7 +123,7 @@ class MatchStatControllerIT {
     }
 
     private MatchStatRequest buildValidRequest(String matchId) {
-        StatsDto stats = new StatsDto(10, 5, 2, 3, 1, 2, 15);
+        StatsDto stats = new StatsDto(10, 5, 2, 3, 1, 2, 15, 4);
 
         TimelineEntryDto event1 = new TimelineEntryDto(1, 0, 7L, "ace", Instant.now());
         TimelineEntryDto event2 = new TimelineEntryDto(1, 1, null, "error", Instant.now());
@@ -131,7 +131,7 @@ class MatchStatControllerIT {
         SetStatDto set1 = new SetStatDto(1, 25, 20, stats, List.of(event1, event2));
         SetStatDto set2 = new SetStatDto(2, 25, 18, stats, List.of());
 
-        PlayerSetStatDto playerSetStat = new PlayerSetStatDto(1, "Libero", 5, 3, 1, 1, 0, 1, 8);
+        PlayerSetStatDto playerSetStat = new PlayerSetStatDto(1, "Libero", 5, 3, 1, 1, 0, 1, 8, 2);
         PlayerStatDto player = new PlayerStatDto(42L, 7, VolleyPosition.Libero, stats, List.of(playerSetStat));
 
         MatchDto matchDto = new MatchDto(
