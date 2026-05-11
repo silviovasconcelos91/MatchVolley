@@ -14,6 +14,7 @@ import vasconcelos.silvio.volleymatch.mapper.MatchStatMapper;
 import vasconcelos.silvio.volleymatch.mapper.TeamMapper;
 import vasconcelos.silvio.volleymatch.model.match.Match;
 import vasconcelos.silvio.volleymatch.model.match.MatchResult;
+import vasconcelos.silvio.volleymatch.model.match.VolleyPosition;
 import vasconcelos.silvio.volleymatch.model.player.Player;
 import vasconcelos.silvio.volleymatch.model.team.Team;
 import vasconcelos.silvio.volleymatch.repository.MatchRepository;
@@ -66,8 +67,8 @@ class TeamServiceTest {
         List<MatchDto> result = teamService.getMatchesByTeam(1L);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).id()).isEqualTo("match-1");
-        assertThat(result.get(0).result()).isEqualTo("WON");
+        assertThat(result.getFirst().id()).isEqualTo("match-1");
+        assertThat(result.getFirst().result()).isEqualTo("WON");
     }
 
     @Test
@@ -99,7 +100,7 @@ class TeamServiceTest {
         List<TeamDto> result = teamService.getAllTeams();
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).name()).isEqualTo("Paris Volley");
+        assertThat(result.getFirst().name()).isEqualTo("Paris Volley");
     }
 
     @Test
@@ -141,7 +142,7 @@ class TeamServiceTest {
     @Test
     void should_addPlayerToTeam_when_assignPlayers() {
         Team team = Team.builder().name("Bordeaux").city("Bordeaux").logoColor("white").build();
-        Player player = Player.builder().name("Alice").role("libero").numero(7).age(22).taille("172cm").build();
+        Player player = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).age(22).taille("172cm").build();
         TeamDto dto = new TeamDto(2L, "Bordeaux", "Bordeaux", "white", List.of());
         when(teamRepository.findById(2L)).thenReturn(Optional.of(team));
         when(playerRepository.findAllById(List.of(10L))).thenReturn(List.of(player));
@@ -166,7 +167,7 @@ class TeamServiceTest {
     @Test
     void should_removePlayerFromTeam_when_removePlayers() {
         Team team = Team.builder().name("Toulouse").city("Toulouse").logoColor("violet").build();
-        Player player = Player.builder().name("Bob").role("setter").numero(1).age(26).taille("190cm").build();
+        Player player = Player.builder().name("Bob").roles(List.of(VolleyPosition.Passeur)).numero(1).age(26).taille("190cm").build();
         player.addTeam(team);
         TeamDto dto = new TeamDto(3L, "Toulouse", "Toulouse", "violet", List.of());
         when(teamRepository.findById(3L)).thenReturn(Optional.of(team));

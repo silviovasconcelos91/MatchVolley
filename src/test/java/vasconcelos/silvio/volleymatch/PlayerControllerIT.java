@@ -14,6 +14,7 @@ import vasconcelos.silvio.volleymatch.dto.common.ApiResponse;
 import vasconcelos.silvio.volleymatch.dto.player.CreatePlayerRequest;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerDto;
 import vasconcelos.silvio.volleymatch.dto.player.UpdatePlayerRequest;
+import vasconcelos.silvio.volleymatch.model.match.VolleyPosition;
 
 import java.util.List;
 
@@ -36,7 +37,7 @@ class PlayerControllerIT {
 
     @Test
     void should_return201AndCreatedPlayer_when_validRequestIsPosted() {
-        CreatePlayerRequest request = new CreatePlayerRequest("Jean Dupont", "libero", 7, 25, "185cm", List.of());
+        CreatePlayerRequest request = new CreatePlayerRequest("Jean Dupont", List.of(VolleyPosition.Libero), 7, 25, "185cm", List.of());
 
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
                 "/api/v1/players", HttpMethod.POST, new HttpEntity<>(request),
@@ -46,13 +47,13 @@ class PlayerControllerIT {
         PlayerDto player = response.getBody().data();
         assertThat(player.id()).isNotNull();
         assertThat(player.name()).isEqualTo("Jean Dupont");
-        assertThat(player.role()).isEqualTo("libero");
+        assertThat(player.roles()).containsExactly(VolleyPosition.Libero);
         assertThat(player.numero()).isEqualTo(7);
     }
 
     @Test
     void should_return200AndPlayer_when_playerExists() {
-        Long playerId = createPlayer("Marc Martin", "setter", 1);
+        Long playerId = createPlayer("Marc Martin", VolleyPosition.Passeur, 1);
 
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
                 "/api/v1/players/" + playerId, HttpMethod.GET, null,
@@ -65,7 +66,7 @@ class PlayerControllerIT {
 
     @Test
     void should_return200AndUpdatedName_when_validUpdateIsPosted() {
-        Long playerId = createPlayer("Old Name", "libero", 9);
+        Long playerId = createPlayer("Old Name", VolleyPosition.Libero, 9);
 
         UpdatePlayerRequest updateRequest = new UpdatePlayerRequest("New Name", null, null, null, null, null);
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
@@ -78,7 +79,7 @@ class PlayerControllerIT {
 
     @Test
     void should_return200_when_playerIsDeleted() {
-        Long playerId = createPlayer("Delete Me", "opposite", 14);
+        Long playerId = createPlayer("Delete Me", VolleyPosition.Pointu, 14);
 
         ResponseEntity<ApiResponse> response = restTemplate.exchange(
                 "/api/v1/players/" + playerId, HttpMethod.DELETE, null, ApiResponse.class);
@@ -87,8 +88,8 @@ class PlayerControllerIT {
         assertThat(response.getBody().status()).isEqualTo(200);
     }
 
-    private Long createPlayer(String name, String role, Integer numero) {
-        CreatePlayerRequest request = new CreatePlayerRequest(name, role, numero, 24, "182cm", List.of());
+    private Long createPlayer(String name, VolleyPosition role, Integer numero) {
+        CreatePlayerRequest request = new CreatePlayerRequest(name, List.of(role), numero, 24, "182cm", List.of());
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
                 "/api/v1/players", HttpMethod.POST, new HttpEntity<>(request),
                 new ParameterizedTypeReference<>() {});

@@ -17,6 +17,7 @@ import vasconcelos.silvio.volleymatch.dto.team.AssignPlayersRequest;
 import vasconcelos.silvio.volleymatch.dto.team.CreateTeamRequest;
 import vasconcelos.silvio.volleymatch.dto.team.RemovePlayersRequest;
 import vasconcelos.silvio.volleymatch.dto.team.TeamDto;
+import vasconcelos.silvio.volleymatch.model.match.VolleyPosition;
 
 import java.util.List;
 
@@ -77,7 +78,7 @@ class TeamControllerIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().data().players()).hasSize(1);
-        assertThat(response.getBody().data().players().get(0).name()).isEqualTo("Player A");
+        assertThat(response.getBody().data().players().getFirst().name()).isEqualTo("Player A");
     }
 
     @Test
@@ -108,7 +109,7 @@ class TeamControllerIT {
     private Long createPlayer(String name, Integer numero) {
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
                 "/api/v1/players", HttpMethod.POST,
-                new HttpEntity<>(new CreatePlayerRequest(name, "libero", numero, 24, "180cm", List.of())),
+                new HttpEntity<>(new CreatePlayerRequest(name, List.of(VolleyPosition.Libero), numero, 24, "180cm", List.of())),
                 new ParameterizedTypeReference<>() {});
         return response.getBody().data().id();
     }

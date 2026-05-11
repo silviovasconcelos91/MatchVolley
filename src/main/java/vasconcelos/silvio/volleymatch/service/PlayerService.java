@@ -116,7 +116,7 @@ public class PlayerService {
         Player player = playerRepository.findById(id)
                 .orElseThrow(() -> new NoSuchElementException("Player not found: " + id));
         if (request.name() != null) player.setName(request.name());
-        if (request.role() != null) player.setRole(request.role());
+        if (request.roles() != null) player.setRoles(request.roles());
         if (request.numero() != null) player.setNumero(request.numero());
         if (request.age() != null) player.setAge(request.age());
         if (request.taille() != null) player.setTaille(request.taille());

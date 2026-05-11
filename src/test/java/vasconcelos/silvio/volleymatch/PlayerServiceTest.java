@@ -52,7 +52,7 @@ class PlayerServiceTest {
         VolleyStats stats = new VolleyStats(10, 5, 2, 3, 1, 1, 8);
         PlayerSetStat setStat = PlayerSetStat.builder()
                 .set(1).position(VolleyPosition.Libero).stats(stats).build();
-        PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 42L, 7, "libero", stats, List.of(setStat));
+        PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 42L, 7, VolleyPosition.Libero, stats, List.of(setStat));
         when(playerRepository.existsById(42L)).thenReturn(true);
         when(teamRepository.existsById(1L)).thenReturn(true);
         when(playerMatchStatRepository.findByPlayerIdAndMatchTeamId(42L, 1L)).thenReturn(List.of(matchStat));
@@ -76,7 +76,7 @@ class PlayerServiceTest {
         PlayerSetStat liberoSet = PlayerSetStat.builder().set(1).position(VolleyPosition.Libero).stats(liberoStats).build();
         PlayerSetStat r4Set = PlayerSetStat.builder().set(2).position(VolleyPosition.R4).stats(r4Stats).build();
         VolleyStats matchTotal = new VolleyStats(13, 4, 1, 3, 1, 1, 12);
-        PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 1L, 7, "libero", matchTotal, List.of(liberoSet, r4Set));
+        PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 1L, 7, VolleyPosition.Libero, matchTotal, List.of(liberoSet, r4Set));
         when(playerRepository.existsById(1L)).thenReturn(true);
         when(teamRepository.existsById(2L)).thenReturn(true);
         when(playerMatchStatRepository.findByPlayerIdAndMatchTeamId(1L, 2L)).thenReturn(List.of(matchStat));
@@ -114,10 +114,10 @@ class PlayerServiceTest {
 
     @Test
     void should_returnAllPlayers_when_getAllPlayers() {
-        Player player1 = Player.builder().name("Alice").role("libero").numero(7).age(22).taille("172cm").build();
-        Player player2 = Player.builder().name("Bob").role("setter").numero(1).age(25).taille("188cm").build();
-        PlayerDto dto1 = new PlayerDto(1L, "Alice", "libero", 7, 22, "172cm", List.of());
-        PlayerDto dto2 = new PlayerDto(2L, "Bob", "setter", 1, 25, "188cm", List.of());
+        Player player1 = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).age(22).taille("172cm").build();
+        Player player2 = Player.builder().name("Bob").roles(List.of(VolleyPosition.Passeur)).numero(1).age(25).taille("188cm").build();
+        PlayerDto dto1 = new PlayerDto(1L, "Alice", List.of(VolleyPosition.Libero), 7, 22, "172cm", List.of());
+        PlayerDto dto2 = new PlayerDto(2L, "Bob", List.of(VolleyPosition.Passeur), 1, 25, "188cm", List.of());
         when(playerRepository.findAll()).thenReturn(List.of(player1, player2));
         when(playerMapper.toDto(player1)).thenReturn(dto1);
         when(playerMapper.toDto(player2)).thenReturn(dto2);
@@ -130,8 +130,8 @@ class PlayerServiceTest {
 
     @Test
     void should_returnPlayer_when_playerExists() {
-        Player player = Player.builder().name("Alice").role("libero").numero(7).age(22).taille("172cm").build();
-        PlayerDto dto = new PlayerDto(1L, "Alice", "libero", 7, 22, "172cm", List.of());
+        Player player = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).age(22).taille("172cm").build();
+        PlayerDto dto = new PlayerDto(1L, "Alice", List.of(VolleyPosition.Libero), 7, 22, "172cm", List.of());
         when(playerRepository.findById(1L)).thenReturn(Optional.of(player));
         when(playerMapper.toDto(player)).thenReturn(dto);
 
@@ -151,9 +151,9 @@ class PlayerServiceTest {
 
     @Test
     void should_returnCreatedPlayer_when_createPlayerWithNoTeams() {
-        CreatePlayerRequest request = new CreatePlayerRequest("Charlie", "opposite", 14, 27, "195cm", List.of());
-        Player entity = Player.builder().name("Charlie").role("opposite").numero(14).age(27).taille("195cm").build();
-        PlayerDto dto = new PlayerDto(3L, "Charlie", "opposite", 14, 27, "195cm", List.of());
+        CreatePlayerRequest request = new CreatePlayerRequest("Charlie", List.of(VolleyPosition.Pointu), 14, 27, "195cm", List.of());
+        Player entity = Player.builder().name("Charlie").roles(List.of(VolleyPosition.Pointu)).numero(14).age(27).taille("195cm").build();
+        PlayerDto dto = new PlayerDto(3L, "Charlie", List.of(VolleyPosition.Pointu), 14, 27, "195cm", List.of());
         when(playerMapper.toEntity(request)).thenReturn(entity);
         when(playerRepository.save(entity)).thenReturn(entity);
         when(playerMapper.toDto(entity)).thenReturn(dto);
@@ -167,8 +167,8 @@ class PlayerServiceTest {
 
     @Test
     void should_updatePlayerName_when_nameChanges() {
-        Player player = Player.builder().name("Old Name").role("libero").numero(7).age(25).taille("180cm").build();
-        PlayerDto dto = new PlayerDto(1L, "New Name", "libero", 7, 25, "180cm", List.of());
+        Player player = Player.builder().name("Old Name").roles(List.of(VolleyPosition.Libero)).numero(7).age(25).taille("180cm").build();
+        PlayerDto dto = new PlayerDto(1L, "New Name", List.of(VolleyPosition.Libero), 7, 25, "180cm", List.of());
         when(playerRepository.findById(1L)).thenReturn(Optional.of(player));
         when(playerMapper.toDto(player)).thenReturn(dto);
 

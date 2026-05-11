@@ -1,7 +1,11 @@
 package vasconcelos.silvio.volleymatch.model.player;
 
+import jakarta.persistence.CollectionTable;
 import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -16,6 +20,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import vasconcelos.silvio.volleymatch.model.match.VolleyPosition;
 import vasconcelos.silvio.volleymatch.model.team.Team;
 
 import java.util.ArrayList;
@@ -38,8 +43,12 @@ public class Player {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @Column(name = "role", nullable = false, length = 30)
-    private String role;
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "player_roles", joinColumns = @JoinColumn(name = "player_id"))
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", length = 20)
+    @Builder.Default
+    private List<VolleyPosition> roles = new ArrayList<>();
 
     @Column(name = "numero", nullable = false)
     private Integer numero;

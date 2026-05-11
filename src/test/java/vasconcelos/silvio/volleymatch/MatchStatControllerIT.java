@@ -20,6 +20,7 @@ import vasconcelos.silvio.volleymatch.dto.match.SetStatDto;
 import vasconcelos.silvio.volleymatch.dto.match.StatsDto;
 import vasconcelos.silvio.volleymatch.dto.match.TimelineEntryDto;
 import vasconcelos.silvio.volleymatch.model.match.Match;
+import vasconcelos.silvio.volleymatch.model.match.VolleyPosition;
 import vasconcelos.silvio.volleymatch.repository.MatchRepository;
 
 import java.time.Instant;
@@ -67,7 +68,7 @@ class MatchStatControllerIT {
         restTemplate.postForEntity("/api/v1/match-stats", request, ApiResponse.class);
 
         Match saved = matchRepository.findById("match-003").orElseThrow();
-        assertThat(saved.getSets().get(0).getTimeline()).hasSize(2);
+        assertThat(saved.getSets().getFirst().getTimeline()).hasSize(2);
     }
 
     @Test
@@ -110,15 +111,15 @@ class MatchStatControllerIT {
 
         MatchDetailResponse data = response.getBody().data();
 
-        assertThat(data.sets().get(0).myScore()).isEqualTo(25);
-        assertThat(data.sets().get(0).oppScore()).isEqualTo(20);
-        assertThat(data.sets().get(0).teamStats()).isNotNull();
+        assertThat(data.sets().getFirst().myScore()).isEqualTo(25);
+        assertThat(data.sets().getFirst().oppScore()).isEqualTo(20);
+        assertThat(data.sets().getFirst().teamStats()).isNotNull();
 
-        PlayerStatDto player = data.players().get(0);
+        PlayerStatDto player = data.players().getFirst();
         assertThat(player.matchStats()).isNotNull();
         assertThat(player.setStats()).hasSize(1);
-        assertThat(player.setStats().get(0).set()).isEqualTo(1);
-        assertThat(player.setStats().get(0).points()).isEqualTo(5);
+        assertThat(player.setStats().getFirst().set()).isEqualTo(1);
+        assertThat(player.setStats().getFirst().points()).isEqualTo(5);
     }
 
     private MatchStatRequest buildValidRequest(String matchId) {
@@ -131,7 +132,7 @@ class MatchStatControllerIT {
         SetStatDto set2 = new SetStatDto(2, 25, 18, stats, List.of());
 
         PlayerSetStatDto playerSetStat = new PlayerSetStatDto(1, "Libero", 5, 3, 1, 1, 0, 1, 8);
-        PlayerStatDto player = new PlayerStatDto(42L, 7, "libero", stats, List.of(playerSetStat));
+        PlayerStatDto player = new PlayerStatDto(42L, 7, VolleyPosition.Libero, stats, List.of(playerSetStat));
 
         MatchDto matchDto = new MatchDto(
                 matchId, 1L, 2L, "2025-2026", 10L,

@@ -4,6 +4,8 @@ import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Embedded;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -42,8 +44,9 @@ public class PlayerMatchStat {
     @Column(name = "number", nullable = false)
     private Integer number;
 
-    @Column(name = "role", nullable = false, length = 30)
-    private String role;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "role", nullable = false, length = 20)
+    private VolleyPosition role;
 
     @Embedded
     private VolleyStats matchStats;

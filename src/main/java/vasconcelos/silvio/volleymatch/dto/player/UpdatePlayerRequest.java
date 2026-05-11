@@ -1,10 +1,12 @@
 package vasconcelos.silvio.volleymatch.dto.player;
 
+import vasconcelos.silvio.volleymatch.model.match.VolleyPosition;
+
 import java.util.List;
 
 public record UpdatePlayerRequest(
         String name,
-        String role,
+        List<VolleyPosition> roles,
         Integer numero,
         Integer age,
         String taille,
