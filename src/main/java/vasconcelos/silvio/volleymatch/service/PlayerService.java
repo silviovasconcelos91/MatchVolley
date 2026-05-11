@@ -7,6 +7,7 @@ import vasconcelos.silvio.volleymatch.dto.match.StatsDto;
 import vasconcelos.silvio.volleymatch.dto.player.CreatePlayerRequest;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerDto;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerSeasonStatsResponse;
+import vasconcelos.silvio.volleymatch.dto.player.PositionStatsDto;
 import vasconcelos.silvio.volleymatch.dto.player.UpdatePlayerRequest;
 import vasconcelos.silvio.volleymatch.mapper.PlayerMapper;
 import vasconcelos.silvio.volleymatch.model.match.PlayerMatchStat;
@@ -43,22 +44,31 @@ public class PlayerService {
         }
         List<PlayerMatchStat> matchStats = playerMatchStatRepository.findByPlayerIdAndMatchTeamId(playerId, teamId);
 
+        List<PlayerSetStat> allSetStats = matchStats.stream()
+                .flatMap(m -> m.getSetStats().stream())
+                .toList();
+
         StatsDto total = sumVolleyStats(
                 matchStats.stream().map(PlayerMatchStat::getMatchStats).toList()
         );
 
-        Map<String, StatsDto> byPosition = matchStats.stream()
-                .flatMap(m -> m.getSetStats().stream())
-                .filter(s -> s.getPosition() != null)
+        Map<String, PositionStatsDto> byPosition = matchStats.stream()
+                .flatMap(m -> m.getSetStats().stream()
+                        .filter(s -> s.getPosition() != null)
+                        .map(s -> Map.entry(m, s)))
                 .collect(Collectors.groupingBy(
-                        s -> s.getPosition().name(),
+                        e -> e.getValue().getPosition().name(),
                         Collectors.collectingAndThen(
                                 Collectors.toList(),
-                                list -> sumVolleyStats(list.stream().map(PlayerSetStat::getStats).toList())
+                                entries -> new PositionStatsDto(
+                                        (int) entries.stream().map(e -> e.getKey().getId()).distinct().count(),
+                                        entries.size(),
+                                        sumVolleyStats(entries.stream().map(e -> e.getValue().getStats()).toList())
+                                )
                         )
                 ));
 
-        return new PlayerSeasonStatsResponse(playerId, matchStats.size(), total, byPosition);
+        return new PlayerSeasonStatsResponse(playerId, matchStats.size(), allSetStats.size(), total, byPosition);
     }
 
     private StatsDto sumVolleyStats(List<VolleyStats> statsList) {

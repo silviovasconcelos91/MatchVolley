@@ -5,7 +5,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import vasconcelos.silvio.volleymatch.dto.match.StatsDto;
 import vasconcelos.silvio.volleymatch.dto.player.CreatePlayerRequest;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerDto;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerSeasonStatsResponse;
@@ -62,9 +61,12 @@ class PlayerServiceTest {
 
         assertThat(result.playerId()).isEqualTo(42L);
         assertThat(result.matchCount()).isEqualTo(1);
+        assertThat(result.setCount()).isEqualTo(1);
         assertThat(result.totalStats().points()).isEqualTo(10);
         assertThat(result.statsByPosition()).containsKey("Libero");
-        assertThat(result.statsByPosition().get("Libero").points()).isEqualTo(10);
+        assertThat(result.statsByPosition().get("Libero").matchCount()).isEqualTo(1);
+        assertThat(result.statsByPosition().get("Libero").setCount()).isEqualTo(1);
+        assertThat(result.statsByPosition().get("Libero").stats().points()).isEqualTo(10);
     }
 
     @Test
@@ -81,9 +83,14 @@ class PlayerServiceTest {
 
         PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(1L, 2L);
 
+        assertThat(result.setCount()).isEqualTo(2);
         assertThat(result.statsByPosition()).hasSize(2);
-        assertThat(result.statsByPosition().get("Libero").receptions()).isEqualTo(10);
-        assertThat(result.statsByPosition().get("R4").attackPoints()).isEqualTo(4);
+        assertThat(result.statsByPosition().get("Libero").matchCount()).isEqualTo(1);
+        assertThat(result.statsByPosition().get("Libero").setCount()).isEqualTo(1);
+        assertThat(result.statsByPosition().get("Libero").stats().receptions()).isEqualTo(10);
+        assertThat(result.statsByPosition().get("R4").matchCount()).isEqualTo(1);
+        assertThat(result.statsByPosition().get("R4").setCount()).isEqualTo(1);
+        assertThat(result.statsByPosition().get("R4").stats().attackPoints()).isEqualTo(4);
     }
 
     @Test

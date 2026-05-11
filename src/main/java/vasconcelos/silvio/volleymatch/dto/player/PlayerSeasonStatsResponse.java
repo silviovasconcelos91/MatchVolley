@@ -7,6 +7,7 @@ import java.util.Map;
 public record PlayerSeasonStatsResponse(
         Long playerId,
         int matchCount,
+        int setCount,
         StatsDto totalStats,
-        Map<String, StatsDto> statsByPosition
+        Map<String, PositionStatsDto> statsByPosition
 ) {}
