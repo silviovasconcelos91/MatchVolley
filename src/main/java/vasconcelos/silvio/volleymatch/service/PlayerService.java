@@ -15,6 +15,7 @@ import vasconcelos.silvio.volleymatch.model.match.PlayerSetStat;
 import vasconcelos.silvio.volleymatch.model.match.VolleyStats;
 import vasconcelos.silvio.volleymatch.model.player.Player;
 import vasconcelos.silvio.volleymatch.model.team.Team;
+import vasconcelos.silvio.volleymatch.model.user.AppUser;
 import vasconcelos.silvio.volleymatch.repository.PlayerMatchStatRepository;
 import vasconcelos.silvio.volleymatch.repository.PlayerRepository;
 import vasconcelos.silvio.volleymatch.repository.TeamRepository;
@@ -34,40 +35,30 @@ public class PlayerService {
     private final TeamRepository teamRepository;
     private final PlayerMatchStatRepository playerMatchStatRepository;
     private final PlayerMapper playerMapper;
+    private final AuthService authService;
 
     public PlayerSeasonStatsResponse getPlayerSeasonStats(Long playerId, Long teamId) {
-        if (!playerRepository.existsById(playerId)) {
+        AppUser user = authService.getCurrentUser();
+        if (!playerRepository.existsByIdAndUser(playerId, user)) {
             throw new NoSuchElementException("Player not found: " + playerId);
         }
-        if (!teamRepository.existsById(teamId)) {
+        if (!teamRepository.existsByIdAndUser(teamId, user)) {
             throw new NoSuchElementException("Team not found: " + teamId);
         }
         List<PlayerMatchStat> matchStats = playerMatchStatRepository.findByPlayerIdAndMatchTeamId(playerId, teamId);
-
         List<PlayerSetStat> allSetStats = matchStats.stream()
-                .flatMap(m -> m.getSetStats().stream())
-                .toList();
-
-        StatsDto total = sumVolleyStats(
-                matchStats.stream().map(PlayerMatchStat::getMatchStats).toList()
-        );
-
+                .flatMap(m -> m.getSetStats().stream()).toList();
+        StatsDto total = sumVolleyStats(matchStats.stream().map(PlayerMatchStat::getMatchStats).toList());
         Map<String, PositionStatsDto> byPosition = matchStats.stream()
                 .flatMap(m -> m.getSetStats().stream()
                         .filter(s -> s.getPosition() != null)
                         .map(s -> Map.entry(m, s)))
                 .collect(Collectors.groupingBy(
                         e -> e.getValue().getPosition().name(),
-                        Collectors.collectingAndThen(
-                                Collectors.toList(),
-                                entries -> new PositionStatsDto(
-                                        (int) entries.stream().map(e -> e.getKey().getId()).distinct().count(),
-                                        entries.size(),
-                                        sumVolleyStats(entries.stream().map(e -> e.getValue().getStats()).toList())
-                                )
-                        )
-                ));
-
+                        Collectors.collectingAndThen(Collectors.toList(), entries -> new PositionStatsDto(
+                                (int) entries.stream().map(e -> e.getKey().getId()).distinct().count(),
+                                entries.size(),
+                                sumVolleyStats(entries.stream().map(e -> e.getValue().getStats()).toList())))));
         return new PlayerSeasonStatsResponse(playerId, matchStats.size(), allSetStats.size(), total, byPosition);
     }
 
@@ -88,22 +79,25 @@ public class PlayerService {
     }
 
     public List<PlayerDto> getAllPlayers() {
-        return playerRepository.findAll().stream()
-                .map(playerMapper::toDto)
-                .toList();
+        AppUser user = authService.getCurrentUser();
+        return playerRepository.findAllByUser(user).stream()
+                .map(playerMapper::toDto).toList();
     }
 
     public PlayerDto getPlayer(Long id) {
-        Player player = playerRepository.findById(id)
+        AppUser user = authService.getCurrentUser();
+        Player player = playerRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new NoSuchElementException("Player not found: " + id));
         return playerMapper.toDto(player);
     }
 
     @Transactional
     public PlayerDto createPlayer(CreatePlayerRequest request) {
+        AppUser user = authService.getCurrentUser();
         Player player = playerMapper.toEntity(request);
+        player.setUser(user);
         if (request.teamIds() != null && !request.teamIds().isEmpty()) {
-            List<Team> teams = teamRepository.findAllById(request.teamIds());
+            List<Team> teams = teamRepository.findAllByIdInAndUser(request.teamIds(), user);
             if (teams.size() != request.teamIds().size()) {
                 throw new NoSuchElementException("One or more teams not found");
             }
@@ -114,7 +108,8 @@ public class PlayerService {
 
     @Transactional
     public PlayerDto updatePlayer(Long id, UpdatePlayerRequest request) {
-        Player player = playerRepository.findById(id)
+        AppUser user = authService.getCurrentUser();
+        Player player = playerRepository.findByIdAndUser(id, user)
                 .orElseThrow(() -> new NoSuchElementException("Player not found: " + id));
         if (request.name() != null) player.setName(request.name());
         if (request.roles() != null) player.setRoles(request.roles());
@@ -122,28 +117,22 @@ public class PlayerService {
         if (request.age() != null) player.setAge(request.age());
         if (request.taille() != null) player.setTaille(request.taille());
         if (request.teamIds() != null) {
-            List<Team> newTeams = teamRepository.findAllById(request.teamIds());
+            List<Team> newTeams = teamRepository.findAllByIdInAndUser(request.teamIds(), user);
             if (newTeams.size() != request.teamIds().size()) {
                 throw new NoSuchElementException("One or more teams not found");
             }
             Set<Long> newIds = newTeams.stream().map(Team::getId).collect(Collectors.toSet());
             Set<Long> currentIds = player.getTeams().stream().map(Team::getId).collect(Collectors.toSet());
-
-            player.getTeams().stream()
-                    .filter(t -> !newIds.contains(t.getId()))
-                    .toList()
-                    .forEach(player::removeTeam);
-
-            newTeams.stream()
-                    .filter(t -> !currentIds.contains(t.getId()))
-                    .forEach(player::addTeam);
+            player.getTeams().stream().filter(t -> !newIds.contains(t.getId())).toList().forEach(player::removeTeam);
+            newTeams.stream().filter(t -> !currentIds.contains(t.getId())).forEach(player::addTeam);
         }
         return playerMapper.toDto(player);
     }
 
     @Transactional
     public void deletePlayer(Long id) {
-        if (!playerRepository.existsById(id)) {
+        AppUser user = authService.getCurrentUser();
+        if (!playerRepository.existsByIdAndUser(id, user)) {
             throw new NoSuchElementException("Player not found: " + id);
         }
         playerRepository.deleteById(id);
