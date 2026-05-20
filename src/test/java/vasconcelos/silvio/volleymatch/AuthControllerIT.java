@@ -81,6 +81,24 @@ class AuthControllerIT {
     }
 
     @Test
+    void should_return400AndSameMessage_when_loginWithWrongPassword() {
+        restTemplate.postForEntity("/api/v1/auth:register",
+                new RegisterRequest("badpwd_it@test.com", "badpwduser", "pass123"), ApiResponse.class);
+        ResponseEntity<ApiResponse> resp = restTemplate.postForEntity(
+                "/api/v1/auth:login", new LoginRequest("badpwd_it@test.com", "wrongpassword"), ApiResponse.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody().message()).isEqualTo("Mauvais email ou mdp");
+    }
+
+    @Test
+    void should_return400AndSameMessage_when_loginWithUnknownEmail() {
+        ResponseEntity<ApiResponse> resp = restTemplate.postForEntity(
+                "/api/v1/auth:login", new LoginRequest("nobody@nowhere.com", "pass123"), ApiResponse.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(resp.getBody().message()).isEqualTo("Mauvais email ou mdp");
+    }
+
+    @Test
     void should_return200_when_logout() {
         restTemplate.postForEntity("/api/v1/auth:register",
                 new RegisterRequest("logout_it@test.com", "logoutuser", "pass123"), ApiResponse.class);

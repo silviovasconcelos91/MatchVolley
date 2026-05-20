@@ -2,6 +2,7 @@ package vasconcelos.silvio.volleymatch.config;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import vasconcelos.silvio.volleymatch.dto.common.ApiResponse;
@@ -10,6 +11,16 @@ import java.util.NoSuchElementException;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
+
+    @ExceptionHandler(AuthenticationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadCredentials(AuthenticationException ex) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.<Void>builder()
+                        .data(null)
+                        .message("Mauvais email ou mot de passe")
+                        .status(HttpStatus.BAD_REQUEST.value())
+                        .build());
+    }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ApiResponse<Void>> handleConflict(IllegalArgumentException ex) {
