@@ -13,7 +13,9 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import vasconcelos.silvio.volleymatch.model.user.AppUser;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -58,6 +60,10 @@ public class Player {
 
     @Column(name = "taille", nullable = false, length = 10)
     private String taille;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private AppUser user;
 
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
