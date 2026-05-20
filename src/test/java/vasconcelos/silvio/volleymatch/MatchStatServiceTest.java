@@ -1,5 +1,6 @@
 package vasconcelos.silvio.volleymatch;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -12,7 +13,9 @@ import vasconcelos.silvio.volleymatch.dto.match.MatchStatRequest;
 import vasconcelos.silvio.volleymatch.dto.match.MatchStatResponse;
 import vasconcelos.silvio.volleymatch.mapper.MatchStatMapper;
 import vasconcelos.silvio.volleymatch.model.match.Match;
+import vasconcelos.silvio.volleymatch.model.user.AppUser;
 import vasconcelos.silvio.volleymatch.repository.MatchRepository;
+import vasconcelos.silvio.volleymatch.service.AuthService;
 import vasconcelos.silvio.volleymatch.service.MatchStatService;
 
 import java.time.LocalDate;
@@ -34,8 +37,20 @@ class MatchStatServiceTest {
     @Mock
     private MatchStatMapper matchStatMapper;
 
+    @Mock
+    private AuthService authService;
+
+    private AppUser testUser;
+
     @InjectMocks
     private MatchStatService matchStatService;
+
+    @BeforeEach
+    void setUp() {
+        testUser = AppUser.builder()
+                .email("test@test.com").pseudo("test").password("hashed").build();
+        when(authService.getCurrentUser()).thenReturn(testUser);
+    }
 
     @Test
     void should_returnMatchStatResponse_when_matchIsSaved() {
@@ -59,7 +74,7 @@ class MatchStatServiceTest {
                 .build();
         MatchDetailResponse expected = new MatchDetailResponse(
                 "match-unit-02", 1L, null, null, null, null, null, LocalDate.now(), "WON", 3, 0, null, List.of(), List.of());
-        when(matchRepository.findById("match-unit-02")).thenReturn(Optional.of(match));
+        when(matchRepository.findByIdAndUser("match-unit-02", testUser)).thenReturn(Optional.of(match));
         when(matchStatMapper.toMatchDetailResponse(match)).thenReturn(expected);
 
         MatchDetailResponse result = matchStatService.getMatchStat("match-unit-02");
@@ -70,7 +85,7 @@ class MatchStatServiceTest {
 
     @Test
     void should_throwResponseStatusException404_when_matchNotFound() {
-        when(matchRepository.findById("unknown")).thenReturn(Optional.empty());
+        when(matchRepository.findByIdAndUser("unknown", testUser)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> matchStatService.getMatchStat("unknown"))
                 .isInstanceOf(ResponseStatusException.class)
