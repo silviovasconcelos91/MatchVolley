@@ -1,5 +1,6 @@
 package vasconcelos.silvio.volleymatch.service;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -31,6 +32,7 @@ public class TeamService {
     private final TeamMapper teamMapper;
     private final MatchStatMapper matchStatMapper;
     private final AuthService authService;
+    private final EntityManager entityManager;
 
     public List<MatchDto> getMatchesByTeam(Long teamId) {
         AppUser user = authService.getCurrentUser();
@@ -75,7 +77,9 @@ public class TeamService {
         }
         players.forEach(player -> player.addTeam(team));
         playerRepository.saveAll(players);
-        return teamMapper.toDto(teamRepository.findByIdAndUser(teamId, user).orElseThrow());
+        playerRepository.flush();
+        entityManager.refresh(team);
+        return teamMapper.toDto(team);
     }
 
     @Transactional
@@ -89,6 +93,8 @@ public class TeamService {
         }
         players.forEach(player -> player.removeTeam(team));
         playerRepository.saveAll(players);
-        return teamMapper.toDto(teamRepository.findByIdAndUser(teamId, user).orElseThrow());
+        playerRepository.flush();
+        entityManager.refresh(team);
+        return teamMapper.toDto(team);
     }
 }

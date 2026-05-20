@@ -1,5 +1,6 @@
 package vasconcelos.silvio.volleymatch;
 
+import jakarta.persistence.EntityManager;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -56,6 +57,9 @@ class TeamServiceTest {
 
     @Mock
     private AuthService authService;
+
+    @Mock
+    private EntityManager entityManager;
 
     private AppUser testUser;
 

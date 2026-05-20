@@ -6,8 +6,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
+import java.util.NoSuchElementException;
 import vasconcelos.silvio.volleymatch.dto.match.MatchDetailResponse;
 import vasconcelos.silvio.volleymatch.dto.match.MatchStatRequest;
 import vasconcelos.silvio.volleymatch.dto.match.MatchStatResponse;
@@ -84,12 +83,11 @@ class MatchStatServiceTest {
     }
 
     @Test
-    void should_throwResponseStatusException404_when_matchNotFound() {
+    void should_throwNoSuchElementException_when_matchNotFound() {
         when(matchRepository.findByIdAndUser("unknown", testUser)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> matchStatService.getMatchStat("unknown"))
-                .isInstanceOf(ResponseStatusException.class)
-                .extracting(e -> ((ResponseStatusException) e).getStatusCode())
-                .isEqualTo(HttpStatus.NOT_FOUND);
+                .isInstanceOf(NoSuchElementException.class)
+                .hasMessageContaining("Match not found");
     }
 }
