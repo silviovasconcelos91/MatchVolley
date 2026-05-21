@@ -5,7 +5,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>4.0.4</version>
+        <version>4.1.0-RC1</version>
         <relativePath/> <!-- lookup parent from repository -->
     </parent>
     <groupId>vasconcelos</groupId>
@@ -14,7 +14,7 @@
     <name>volleymatch</name>
     <description>volleymatch</description>
     <properties>
-        <java.version>24</java.version>
+        <java.version>25</java.version>
     </properties>
     <dependencies>
         <dependency>
@@ -127,7 +127,7 @@
                             <version>0.2.0</version>
                         </path>
                     </annotationProcessorPaths>
-                    <release>21</release>
+                    <release>25</release>
                 </configuration>
             </plugin>
             <plugin>

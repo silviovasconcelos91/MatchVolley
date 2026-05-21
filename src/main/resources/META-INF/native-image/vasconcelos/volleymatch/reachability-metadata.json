@@ -2,23 +2,15 @@
   "$schema": "https://github.com/oracle/graal/blob/master/docs/reference-manual/native-image/assets/reachability-metadata-schema-v1.2.0.json",
   "reflection": [
     {
-      "type": "java.util.UUID",
-      "allDeclaredConstructors": true,
-      "allPublicConstructors": true,
-      "allDeclaredMethods": true,
-      "allPublicMethods": true,
-      "allDeclaredFields": true,
-      "allPublicFields": true
+      "type": "java.util.UUID"
     },
     {
-      "type": "java.util.UUID[]",
-      "allDeclaredConstructors": true,
-      "allPublicConstructors": true
+      "type": "java.util.UUID[]"
     }
   ],
   "resources": [
     {
-      "glob": "db\/migration\/*"
+      "glob": "db/migration/*"
     }
   ]
 }
