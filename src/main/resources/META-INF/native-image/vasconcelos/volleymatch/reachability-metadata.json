@@ -13,7 +13,7 @@
   ],
   "resources": [
     {
-      "glob": "META-INF/services/java.util.UUID"
+      "glob": "db\/migration\/*"
     }
   ]
 }
