@@ -15,13 +15,9 @@ public class NativeConfig {
 
         @Override
         public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
-            // Reflection
             hints.reflection()
-                    .registerType(UUID.class, MemberCategory.values());
-
-            // Serialization (si tu sérialises/désérialises des UUID)
-            hints.serialization()
-                    .registerType(UUID.class);
+                    .registerType(UUID.class, MemberCategory.values())
+                    .registerType(UUID[].class, MemberCategory.values());
         }
     }
 }
