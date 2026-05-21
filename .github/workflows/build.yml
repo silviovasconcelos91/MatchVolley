@@ -15,7 +15,7 @@ jobs:
       - name: Set up GraalVM
         uses: graalvm/setup-graalvm@v1
         with:
-          java-version: '21'
+          java-version: '24'
           distribution: 'graalvm-community'
           native-image-job-reports: 'true'
 
@@ -35,7 +35,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: .
-          file: Dockerfile.railway.railway
+          file: DockerfileRailway
           push: true
           tags: ${{ secrets.DOCKERHUB_USERNAME }}/volleymatch:latest
           cache-from: type=gha
