@@ -20,7 +20,7 @@ jobs:
           native-image-job-reports: 'true'
 
       - name: Build native image
-        run: mvn clean process-aot -Pnative native:compile -DskipTests --no-transfer-progress
+        run: mvn clean spring-boot:process-aot -Pnative native:compile -DskipTests --no-transfer-progress
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
