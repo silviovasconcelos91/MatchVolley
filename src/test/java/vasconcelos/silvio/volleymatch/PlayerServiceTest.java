@@ -1,5 +1,6 @@
 package vasconcelos.silvio.volleymatch;
 
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -15,9 +16,11 @@ import vasconcelos.silvio.volleymatch.model.match.PlayerSetStat;
 import vasconcelos.silvio.volleymatch.model.match.VolleyPosition;
 import vasconcelos.silvio.volleymatch.model.match.VolleyStats;
 import vasconcelos.silvio.volleymatch.model.player.Player;
+import vasconcelos.silvio.volleymatch.model.user.AppUser;
 import vasconcelos.silvio.volleymatch.repository.PlayerMatchStatRepository;
 import vasconcelos.silvio.volleymatch.repository.PlayerRepository;
 import vasconcelos.silvio.volleymatch.repository.TeamRepository;
+import vasconcelos.silvio.volleymatch.service.AuthService;
 import vasconcelos.silvio.volleymatch.service.PlayerService;
 
 import java.util.List;
@@ -26,6 +29,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -44,8 +48,20 @@ class PlayerServiceTest {
     @Mock
     private PlayerMapper playerMapper;
 
+    @Mock
+    private AuthService authService;
+
+    private AppUser testUser;
+
     @InjectMocks
     private PlayerService playerService;
+
+    @BeforeEach
+    void setUp() {
+        testUser = AppUser.builder()
+                .email("test@test.com").pseudo("test").password("hashed").build();
+        when(authService.getCurrentUser()).thenReturn(testUser);
+    }
 
     @Test
     void should_returnSeasonStats_when_playerHasMatches() {
@@ -53,8 +69,8 @@ class PlayerServiceTest {
         PlayerSetStat setStat = PlayerSetStat.builder()
                 .set(1).position(VolleyPosition.Libero).stats(stats).build();
         PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 42L, 7, VolleyPosition.Libero, stats, List.of(setStat));
-        when(playerRepository.existsById(42L)).thenReturn(true);
-        when(teamRepository.existsById(1L)).thenReturn(true);
+        when(playerRepository.existsByIdAndUser(42L, testUser)).thenReturn(true);
+        when(teamRepository.existsByIdAndUser(1L, testUser)).thenReturn(true);
         when(playerMatchStatRepository.findByPlayerIdAndMatchTeamId(42L, 1L)).thenReturn(List.of(matchStat));
 
         PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(42L, 1L);
@@ -77,8 +93,8 @@ class PlayerServiceTest {
         PlayerSetStat r4Set = PlayerSetStat.builder().set(2).position(VolleyPosition.R4).stats(r4Stats).build();
         VolleyStats matchTotal = new VolleyStats(13, 4, 1, 3, 1, 1, 12, 4);
         PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 1L, 7, VolleyPosition.Libero, matchTotal, List.of(liberoSet, r4Set));
-        when(playerRepository.existsById(1L)).thenReturn(true);
-        when(teamRepository.existsById(2L)).thenReturn(true);
+        when(playerRepository.existsByIdAndUser(1L, testUser)).thenReturn(true);
+        when(teamRepository.existsByIdAndUser(2L, testUser)).thenReturn(true);
         when(playerMatchStatRepository.findByPlayerIdAndMatchTeamId(1L, 2L)).thenReturn(List.of(matchStat));
 
         PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(1L, 2L);
@@ -95,7 +111,7 @@ class PlayerServiceTest {
 
     @Test
     void should_throwNoSuchElementException_when_getSeasonStatsPlayerNotFound() {
-        when(playerRepository.existsById(99L)).thenReturn(false);
+        when(playerRepository.existsByIdAndUser(99L, testUser)).thenReturn(false);
 
         assertThatThrownBy(() -> playerService.getPlayerSeasonStats(99L, 1L))
                 .isInstanceOf(NoSuchElementException.class)
@@ -104,8 +120,8 @@ class PlayerServiceTest {
 
     @Test
     void should_throwNoSuchElementException_when_getSeasonStatsTeamNotFound() {
-        when(playerRepository.existsById(1L)).thenReturn(true);
-        when(teamRepository.existsById(99L)).thenReturn(false);
+        when(playerRepository.existsByIdAndUser(1L, testUser)).thenReturn(true);
+        when(teamRepository.existsByIdAndUser(99L, testUser)).thenReturn(false);
 
         assertThatThrownBy(() -> playerService.getPlayerSeasonStats(1L, 99L))
                 .isInstanceOf(NoSuchElementException.class)
@@ -118,7 +134,7 @@ class PlayerServiceTest {
         Player player2 = Player.builder().name("Bob").roles(List.of(VolleyPosition.Passeur)).numero(1).age(25).taille("188cm").build();
         PlayerDto dto1 = new PlayerDto(1L, "Alice", List.of(VolleyPosition.Libero), 7, 22, "172cm", List.of());
         PlayerDto dto2 = new PlayerDto(2L, "Bob", List.of(VolleyPosition.Passeur), 1, 25, "188cm", List.of());
-        when(playerRepository.findAll()).thenReturn(List.of(player1, player2));
+        when(playerRepository.findAllByUser(testUser)).thenReturn(List.of(player1, player2));
         when(playerMapper.toDto(player1)).thenReturn(dto1);
         when(playerMapper.toDto(player2)).thenReturn(dto2);
 
@@ -132,7 +148,7 @@ class PlayerServiceTest {
     void should_returnPlayer_when_playerExists() {
         Player player = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).age(22).taille("172cm").build();
         PlayerDto dto = new PlayerDto(1L, "Alice", List.of(VolleyPosition.Libero), 7, 22, "172cm", List.of());
-        when(playerRepository.findById(1L)).thenReturn(Optional.of(player));
+        when(playerRepository.findByIdAndUser(1L, testUser)).thenReturn(Optional.of(player));
         when(playerMapper.toDto(player)).thenReturn(dto);
 
         PlayerDto result = playerService.getPlayer(1L);
@@ -142,7 +158,7 @@ class PlayerServiceTest {
 
     @Test
     void should_throwNoSuchElementException_when_playerNotFound() {
-        when(playerRepository.findById(99L)).thenReturn(Optional.empty());
+        when(playerRepository.findByIdAndUser(99L, testUser)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> playerService.getPlayer(99L))
                 .isInstanceOf(NoSuchElementException.class)
@@ -155,21 +171,21 @@ class PlayerServiceTest {
         Player entity = Player.builder().name("Charlie").roles(List.of(VolleyPosition.Pointu)).numero(14).age(27).taille("195cm").build();
         PlayerDto dto = new PlayerDto(3L, "Charlie", List.of(VolleyPosition.Pointu), 14, 27, "195cm", List.of());
         when(playerMapper.toEntity(request)).thenReturn(entity);
-        when(playerRepository.save(entity)).thenReturn(entity);
+        when(playerRepository.save(any())).thenReturn(entity);
         when(playerMapper.toDto(entity)).thenReturn(dto);
 
         PlayerDto result = playerService.createPlayer(request);
 
         assertThat(result.name()).isEqualTo("Charlie");
         assertThat(result.numero()).isEqualTo(14);
-        verify(playerRepository).save(entity);
+        verify(playerRepository).save(any());
     }
 
     @Test
     void should_updatePlayerName_when_nameChanges() {
         Player player = Player.builder().name("Old Name").roles(List.of(VolleyPosition.Libero)).numero(7).age(25).taille("180cm").build();
         PlayerDto dto = new PlayerDto(1L, "New Name", List.of(VolleyPosition.Libero), 7, 25, "180cm", List.of());
-        when(playerRepository.findById(1L)).thenReturn(Optional.of(player));
+        when(playerRepository.findByIdAndUser(1L, testUser)).thenReturn(Optional.of(player));
         when(playerMapper.toDto(player)).thenReturn(dto);
 
         UpdatePlayerRequest request = new UpdatePlayerRequest("New Name", null, null, null, null, null);
@@ -181,7 +197,7 @@ class PlayerServiceTest {
 
     @Test
     void should_throwNoSuchElementException_when_updatePlayerNotFound() {
-        when(playerRepository.findById(99L)).thenReturn(Optional.empty());
+        when(playerRepository.findByIdAndUser(99L, testUser)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> playerService.updatePlayer(99L, new UpdatePlayerRequest(null, null, null, null, null, null)))
                 .isInstanceOf(NoSuchElementException.class);
@@ -189,7 +205,7 @@ class PlayerServiceTest {
 
     @Test
     void should_deletePlayer_when_playerExists() {
-        when(playerRepository.existsById(1L)).thenReturn(true);
+        when(playerRepository.existsByIdAndUser(1L, testUser)).thenReturn(true);
 
         playerService.deletePlayer(1L);
 
@@ -198,7 +214,7 @@ class PlayerServiceTest {
 
     @Test
     void should_throwNoSuchElementException_when_deletePlayerNotFound() {
-        when(playerRepository.existsById(99L)).thenReturn(false);
+        when(playerRepository.existsByIdAndUser(99L, testUser)).thenReturn(false);
 
         assertThatThrownBy(() -> playerService.deletePlayer(99L))
                 .isInstanceOf(NoSuchElementException.class);

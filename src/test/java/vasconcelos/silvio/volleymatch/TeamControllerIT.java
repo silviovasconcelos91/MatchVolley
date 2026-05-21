@@ -1,15 +1,10 @@
 package vasconcelos.silvio.volleymatch;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.resttestclient.TestRestTemplate;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.ParameterizedTypeReference;
-import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.test.context.ActiveProfiles;
 import vasconcelos.silvio.volleymatch.dto.common.ApiResponse;
 import vasconcelos.silvio.volleymatch.dto.player.CreatePlayerRequest;
 import vasconcelos.silvio.volleymatch.dto.player.PlayerDto;
@@ -23,16 +18,11 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
-@ActiveProfiles("test")
-class TeamControllerIT {
-
-    @Autowired
-    private TestRestTemplate restTemplate;
+class TeamControllerIT extends BaseIT {
 
     @Test
     void should_return200AndList_when_getAllTeams() {
-        ResponseEntity<ApiResponse> response = restTemplate.getForEntity("/api/v1/teams", ApiResponse.class);
+        ResponseEntity<ApiResponse> response = restTemplate.exchange("/api/v1/teams", HttpMethod.GET, authEntity(), ApiResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody().status()).isEqualTo(200);
@@ -43,7 +33,7 @@ class TeamControllerIT {
         CreateTeamRequest request = new CreateTeamRequest("Volley Club", "Paris", "blue");
 
         ResponseEntity<ApiResponse<TeamDto>> response = restTemplate.exchange(
-                "/api/v1/teams", HttpMethod.POST, new HttpEntity<>(request),
+                "/api/v1/teams", HttpMethod.POST, authEntity(request),
                 new ParameterizedTypeReference<>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -58,7 +48,7 @@ class TeamControllerIT {
         Long teamId = createTeam("Lyon Volley", "Lyon");
 
         ResponseEntity<ApiResponse<TeamDto>> response = restTemplate.exchange(
-                "/api/v1/teams/" + teamId, HttpMethod.GET, null,
+                "/api/v1/teams/" + teamId, HttpMethod.GET, authEntity(),
                 new ParameterizedTypeReference<>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -73,7 +63,7 @@ class TeamControllerIT {
 
         AssignPlayersRequest request = new AssignPlayersRequest(List.of(playerId));
         ResponseEntity<ApiResponse<TeamDto>> response = restTemplate.exchange(
-                "/api/v1/teams/" + teamId + ":assignPlayers", HttpMethod.POST, new HttpEntity<>(request),
+                "/api/v1/teams/" + teamId + ":assignPlayers", HttpMethod.POST, authEntity(request),
                 new ParameterizedTypeReference<>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -87,12 +77,12 @@ class TeamControllerIT {
         Long playerId = createPlayer("Player B", 22);
 
         restTemplate.exchange("/api/v1/teams/" + teamId + ":assignPlayers", HttpMethod.POST,
-                new HttpEntity<>(new AssignPlayersRequest(List.of(playerId))),
+                authEntity(new AssignPlayersRequest(List.of(playerId))),
                 new ParameterizedTypeReference<ApiResponse<TeamDto>>() {});
 
         RemovePlayersRequest removeRequest = new RemovePlayersRequest(List.of(playerId));
         ResponseEntity<ApiResponse<TeamDto>> response = restTemplate.exchange(
-                "/api/v1/teams/" + teamId + ":removePlayers", HttpMethod.POST, new HttpEntity<>(removeRequest),
+                "/api/v1/teams/" + teamId + ":removePlayers", HttpMethod.POST, authEntity(removeRequest),
                 new ParameterizedTypeReference<>() {});
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
@@ -101,7 +91,8 @@ class TeamControllerIT {
 
     private Long createTeam(String name, String city) {
         ResponseEntity<ApiResponse<TeamDto>> response = restTemplate.exchange(
-                "/api/v1/teams", HttpMethod.POST, new HttpEntity<>(new CreateTeamRequest(name, city, "red")),
+                "/api/v1/teams", HttpMethod.POST,
+                authEntity(new CreateTeamRequest(name, city, "red")),
                 new ParameterizedTypeReference<>() {});
         return response.getBody().data().id();
     }
@@ -109,7 +100,7 @@ class TeamControllerIT {
     private Long createPlayer(String name, Integer numero) {
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
                 "/api/v1/players", HttpMethod.POST,
-                new HttpEntity<>(new CreatePlayerRequest(name, List.of(VolleyPosition.Libero), numero, 24, "180cm", List.of())),
+                authEntity(new CreatePlayerRequest(name, List.of(VolleyPosition.Libero), numero, 24, "180cm", List.of())),
                 new ParameterizedTypeReference<>() {});
         return response.getBody().data().id();
     }
