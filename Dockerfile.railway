@@ -1,0 +1,5 @@
+FROM debian:bookworm-slim
+WORKDIR /app
+COPY target/VolleyMatch .
+EXPOSE 8080
+ENTRYPOINT ["./VolleyMatch", "--spring.profiles.active=prod"]
