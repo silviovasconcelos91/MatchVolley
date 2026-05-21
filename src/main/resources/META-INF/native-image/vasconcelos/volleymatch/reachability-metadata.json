@@ -9,6 +9,11 @@
       "allPublicMethods": true,
       "allDeclaredFields": true,
       "allPublicFields": true
+    },
+    {
+      "type": "java.util.UUID[]",
+      "allDeclaredConstructors": true,
+      "allPublicConstructors": true
     }
   ],
   "resources": [
