@@ -17,6 +17,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ConcreteProxy;
 import vasconcelos.volleymatch.model.user.AppUser;
 
 import java.time.LocalDate;
@@ -25,6 +26,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "matches")
+@ConcreteProxy
 @Getter
 @Builder
 @NoArgsConstructor

@@ -18,12 +18,14 @@ import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ConcreteProxy;
 
 import java.util.ArrayList;
 import java.util.List;
 
 @Entity
 @Table(name = "player_match_stats")
+@ConcreteProxy
 @Getter
 @Setter
 @NoArgsConstructor
