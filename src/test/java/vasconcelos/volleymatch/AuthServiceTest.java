@@ -13,11 +13,13 @@ import vasconcelos.volleymatch.dto.auth.AuthResponse;
 import vasconcelos.volleymatch.dto.auth.LoginRequest;
 import vasconcelos.volleymatch.dto.auth.RegisterRequest;
 import vasconcelos.volleymatch.dto.auth.UserResponse;
+import vasconcelos.volleymatch.exception.EmailNotVerifiedException;
 import vasconcelos.volleymatch.mapper.UserMapper;
 import vasconcelos.volleymatch.model.user.AppUser;
 import vasconcelos.volleymatch.model.user.RefreshToken;
 import vasconcelos.volleymatch.repository.AppUserRepository;
 import vasconcelos.volleymatch.service.AuthService;
+import vasconcelos.volleymatch.service.EmailVerificationService;
 import vasconcelos.volleymatch.service.JwtService;
 import vasconcelos.volleymatch.service.RefreshTokenService;
 
@@ -28,6 +30,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -40,12 +43,13 @@ class AuthServiceTest {
     @Mock private RefreshTokenService refreshTokenService;
     @Mock private AuthenticationManager authenticationManager;
     @Mock private UserMapper userMapper;
+    @Mock private EmailVerificationService emailVerificationService;
 
     @InjectMocks
     private AuthService authService;
 
     @Test
-    void should_registerUser_when_emailAndPseudoAreNew() {
+    void should_registerUserAndSendVerificationEmail_when_emailAndPseudoAreNew() {
         RegisterRequest req = new RegisterRequest("new@test.com", "newuser", "pass123");
         AppUser saved = AppUser.builder().email("new@test.com").pseudo("newuser").password("hashed").build();
         UserResponse expected = new UserResponse(UUID.randomUUID(), "new@test.com", "newuser");
@@ -59,6 +63,7 @@ class AuthServiceTest {
 
         assertThat(result.email()).isEqualTo("new@test.com");
         verify(appUserRepository).save(any());
+        verify(emailVerificationService).sendVerification(saved);
     }
 
     @Test
@@ -83,13 +88,13 @@ class AuthServiceTest {
     }
 
     @Test
-    void should_returnTokens_when_loginCredentialsAreValid() {
-        AppUser user = AppUser.builder().email("user@test.com").pseudo("user").password("hashed").build();
-        RefreshToken refreshToken = RefreshToken.builder()
-                .token("refresh-uuid")
-                .user(user)
-                .expiresAt(LocalDateTime.now().plusDays(30))
+    void should_returnTokens_when_loginWithVerifiedEmail() {
+        AppUser user = AppUser.builder()
+                .email("user@test.com").pseudo("user").password("hashed")
+                .emailVerified(true)
                 .build();
+        RefreshToken refreshToken = RefreshToken.builder()
+                .token("refresh-uuid").user(user).expiresAt(LocalDateTime.now().plusDays(30)).build();
         when(appUserRepository.findByEmail("user@test.com")).thenReturn(Optional.of(user));
         when(jwtService.generateToken(user)).thenReturn("access-jwt");
         when(refreshTokenService.create(user)).thenReturn(refreshToken);
@@ -99,6 +104,21 @@ class AuthServiceTest {
         assertThat(result.accessToken()).isEqualTo("access-jwt");
         assertThat(result.refreshToken()).isEqualTo("refresh-uuid");
         verify(authenticationManager).authenticate(any(UsernamePasswordAuthenticationToken.class));
+    }
+
+    @Test
+    void should_throwEmailNotVerified_when_loginWithUnverifiedEmail() {
+        AppUser user = AppUser.builder()
+                .email("user@test.com").pseudo("user").password("hashed")
+                .emailVerified(false)
+                .build();
+        when(appUserRepository.findByEmail("user@test.com")).thenReturn(Optional.of(user));
+        doThrow(new EmailNotVerifiedException("Please verify your email before logging in"))
+                .when(emailVerificationService).attemptResendOnLogin(user);
+
+        assertThatThrownBy(() -> authService.login(new LoginRequest("user@test.com", "pass123")))
+                .isInstanceOf(EmailNotVerifiedException.class)
+                .hasMessageContaining("verify your email");
     }
 
     @Test

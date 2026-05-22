@@ -26,6 +26,7 @@ public class AuthService {
     private final RefreshTokenService refreshTokenService;
     private final AuthenticationManager authenticationManager;
     private final UserMapper userMapper;
+    private final EmailVerificationService emailVerificationService;
 
     @Transactional
     public UserResponse register(RegisterRequest request) {
@@ -38,13 +39,18 @@ public class AuthService {
                 .pseudo(request.pseudo())
                 .password(passwordEncoder.encode(request.password()))
                 .build();
-        return userMapper.toResponse(appUserRepository.save(user));
+        AppUser saved = appUserRepository.save(user);
+        emailVerificationService.sendVerification(saved);
+        return userMapper.toResponse(saved);
     }
 
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password()));
         AppUser user = appUserRepository.findByEmail(request.email()).orElseThrow();
+        if (!user.isEmailVerified()) {
+            emailVerificationService.attemptResendOnLogin(user);
+        }
         String accessToken = jwtService.generateToken(user);
         RefreshToken refreshToken = refreshTokenService.create(user);
         return new AuthResponse(accessToken, refreshToken.getToken());
