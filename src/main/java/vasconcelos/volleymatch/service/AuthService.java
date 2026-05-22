@@ -44,6 +44,7 @@ public class AuthService {
         return userMapper.toResponse(saved);
     }
 
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(request.email(), request.password()));
