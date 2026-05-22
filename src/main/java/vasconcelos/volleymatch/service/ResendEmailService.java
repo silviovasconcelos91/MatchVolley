@@ -14,20 +14,24 @@ public class ResendEmailService {
     private final RestClient restClient;
     private final String apiKey;
     private final String fromEmail;
+    private final String testRecipient;
 
     public ResendEmailService(
             RestClient.Builder restClientBuilder,
             @Value("${resend.api-key}") String apiKey,
-            @Value("${resend.from-email}") String fromEmail) {
+            @Value("${resend.from-email}") String fromEmail,
+            @Value("${resend.test-recipient:}") String testRecipient) {
         this.restClient = restClientBuilder.build();
         this.apiKey = apiKey;
         this.fromEmail = fromEmail;
+        this.testRecipient = testRecipient;
     }
 
     public void sendVerificationEmail(String to, String verifyUrl) {
+        String recipient = testRecipient.isBlank() ? to : testRecipient;
         Map<String, Object> body = Map.of(
                 "from", fromEmail,
-                "to", List.of(to),
+                "to", List.of(recipient),
                 "subject", "Verify your MatchVolley account",
                 "html", "<p>Click <a href='" + verifyUrl + "'>here</a> to verify your account.</p>"
                         + "<p>This link expires in 24 hours.</p>"
