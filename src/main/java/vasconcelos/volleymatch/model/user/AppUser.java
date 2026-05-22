@@ -10,6 +10,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import lombok.Setter;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
@@ -42,6 +43,11 @@ public class AppUser implements UserDetails {
     @Column(name = "created_at", nullable = false)
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "email_verified", nullable = false)
+    @Builder.Default
+    @Setter
+    private boolean emailVerified = false;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
