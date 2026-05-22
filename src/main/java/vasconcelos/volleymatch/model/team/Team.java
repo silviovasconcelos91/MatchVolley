@@ -15,6 +15,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ConcreteProxy;
 import vasconcelos.volleymatch.model.player.Player;
 import vasconcelos.volleymatch.model.user.AppUser;
 
@@ -23,6 +24,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "teams")
+@ConcreteProxy
 @Getter
 @Builder
 @NoArgsConstructor
@@ -42,7 +44,7 @@ public class Team {
     @Column(name = "logo_color", length = 20)
     private String logoColor;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     @Setter
     private AppUser user;

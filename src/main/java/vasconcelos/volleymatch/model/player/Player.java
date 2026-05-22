@@ -22,6 +22,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ConcreteProxy;
 import vasconcelos.volleymatch.model.match.VolleyPosition;
 import vasconcelos.volleymatch.model.team.Team;
 
@@ -30,6 +31,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "players")
+@ConcreteProxy
 @Getter
 @Setter
 @Builder
@@ -61,7 +63,7 @@ public class Player {
     @Column(name = "taille", nullable = false, length = 10)
     private String taille;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     private AppUser user;
 

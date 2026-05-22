@@ -14,12 +14,14 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ConcreteProxy;
 
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
 @Table(name = "email_verification_tokens")
+@ConcreteProxy
 @Getter
 @Setter
 @Builder
@@ -34,7 +36,7 @@ public class EmailVerificationToken {
     @Column(nullable = false, unique = true)
     private UUID token;
 
-    @OneToOne(fetch = FetchType.LAZY)
+    @OneToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false, unique = true)
     private AppUser user;
 

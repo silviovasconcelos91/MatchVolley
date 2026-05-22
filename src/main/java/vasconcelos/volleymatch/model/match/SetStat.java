@@ -15,6 +15,7 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ConcreteProxy;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 import vasconcelos.volleymatch.dto.match.TimelineEntryDto;
@@ -23,6 +24,7 @@ import java.util.List;
 
 @Entity
 @Table(name = "set_stats")
+@ConcreteProxy
 @Getter
 @Builder
 @NoArgsConstructor
@@ -34,7 +36,7 @@ public class SetStat {
     private Long id;
 
     @Setter
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "match_id", nullable = false)
     private Match match;
 

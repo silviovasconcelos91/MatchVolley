@@ -17,9 +17,11 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.ConcreteProxy;
 
 @Entity
 @Table(name = "player_set_stats")
+@ConcreteProxy
 @Getter
 @Setter
 @Builder
@@ -31,7 +33,7 @@ public class PlayerSetStat {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @ManyToOne(fetch = FetchType.EAGER, optional = false)
     @JoinColumn(name = "player_match_stat_id", nullable = false)
     private PlayerMatchStat playerMatchStat;
 

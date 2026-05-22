@@ -71,7 +71,7 @@ public class Match {
     @Column(name = "opp_sets", nullable = false)
     private Integer oppSets;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     @Setter
     private AppUser user;
