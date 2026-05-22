@@ -184,6 +184,38 @@ class EmailVerificationServiceTest {
     }
 
     @Test
+    void should_throwEmailNotVerified_when_attemptResendOnLoginWithTokenInCooldown() {
+        AppUser user = AppUser.builder().email("t@t.com").pseudo("t").password("p").build();
+        EmailVerificationToken token = EmailVerificationToken.builder()
+                .token(UUID.randomUUID()).user(user)
+                .expiresAt(LocalDateTime.now().plusHours(10))
+                .lastSentAt(LocalDateTime.now().minusMinutes(15))
+                .verified(false)
+                .build();
+        when(tokenRepository.findByUser(user)).thenReturn(Optional.of(token));
+
+        assertThatThrownBy(() -> emailVerificationService.attemptResendOnLogin(user))
+                .isInstanceOf(EmailNotVerifiedException.class);
+
+        verify(resendEmailService, never()).sendVerificationEmail(any(), any());
+    }
+
+    @Test
+    void should_createAndSendEmail_when_resendWithNoExistingToken() {
+        AppUser user = AppUser.builder().email("t@t.com").pseudo("t").password("p").build();
+        when(appUserRepository.findByEmail("t@t.com")).thenReturn(Optional.of(user));
+        when(tokenRepository.findByUser(user)).thenReturn(Optional.empty());
+        when(tokenRepository.save(any())).thenAnswer(inv -> inv.getArgument(0));
+
+        emailVerificationService.resendVerification("t@t.com");
+
+        verify(tokenRepository).save(any(EmailVerificationToken.class));
+        verify(resendEmailService).sendVerificationEmail(
+                eq("t@t.com"),
+                contains("auth:verify?token="));
+    }
+
+    @Test
     void should_resendAndThrow_when_attemptResendOnLoginWithExpiredCooldown() {
         AppUser user = AppUser.builder().email("t@t.com").pseudo("t").password("p").build();
         EmailVerificationToken token = EmailVerificationToken.builder()

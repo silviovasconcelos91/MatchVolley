@@ -38,6 +38,11 @@ public class EmailVerificationService {
 
     @Transactional
     public void sendVerification(AppUser user) {
+        Optional<EmailVerificationToken> existing = tokenRepository.findByUser(user);
+        if (existing.isPresent()) {
+            refreshAndSend(existing.get(), user.getEmail());
+            return;
+        }
         UUID tokenValue = UUID.randomUUID();
         EmailVerificationToken token = EmailVerificationToken.builder()
                 .token(tokenValue)
@@ -77,27 +82,24 @@ public class EmailVerificationService {
         if (existing.isEmpty()) {
             sendVerification(user);
         } else {
-            EmailVerificationToken token = existing.get();
-            token.setToken(UUID.randomUUID());
-            token.setExpiresAt(LocalDateTime.now().plusHours(24));
-            token.setLastSentAt(LocalDateTime.now());
-            tokenRepository.save(token);
-            resendEmailService.sendVerificationEmail(user.getEmail(), buildLink(token.getToken()));
+            refreshAndSend(existing.get(), user.getEmail());
         }
     }
 
     @Transactional
     public void attemptResendOnLogin(AppUser user) {
-        tokenRepository.findByUser(user).ifPresent(token -> {
-            if (!isInCooldown(token)) {
-                token.setToken(UUID.randomUUID());
-                token.setExpiresAt(LocalDateTime.now().plusHours(24));
-                token.setLastSentAt(LocalDateTime.now());
-                tokenRepository.save(token);
-                resendEmailService.sendVerificationEmail(user.getEmail(), buildLink(token.getToken()));
-            }
-        });
+        tokenRepository.findByUser(user)
+                .filter(token -> !isInCooldown(token))
+                .ifPresent(token -> refreshAndSend(token, user.getEmail()));
         throw new EmailNotVerifiedException("Please verify your email before logging in");
+    }
+
+    private void refreshAndSend(EmailVerificationToken token, String email) {
+        token.setToken(UUID.randomUUID());
+        token.setExpiresAt(LocalDateTime.now().plusHours(24));
+        token.setLastSentAt(LocalDateTime.now());
+        tokenRepository.save(token);
+        resendEmailService.sendVerificationEmail(email, buildLink(token.getToken()));
     }
 
     private String buildLink(UUID tokenValue) {
