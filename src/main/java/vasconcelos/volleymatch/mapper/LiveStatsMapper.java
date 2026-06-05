@@ -47,7 +47,7 @@ public interface LiveStatsMapper {
 
     @Mapping(target = "matchId", source = "match.id")
     @Mapping(target = "teamId", source = "match.teamId")
-    @Mapping(target = "venue", expression = "java(session.getMatch().getHome() ? \"home\" : \"away\")")
+    @Mapping(target = "venue", expression = "java(Boolean.TRUE.equals(session.getMatch().getHome()) ? \"home\" : \"away\")")
     @Mapping(target = "setsWon", expression = "java(new SetsWonDto(session.getSetsWonMine(), session.getSetsWonOpp()))")
     @Mapping(target = "sets", source = "sets")
     LiveStatsResponse toResponse(MatchLiveSession session);

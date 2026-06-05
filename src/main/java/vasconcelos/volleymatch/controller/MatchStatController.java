@@ -60,6 +60,9 @@ public class MatchStatController {
             @PathVariable String matchId,
             @RequestBody LiveStatsRequest request) {
 
+        if (!matchId.equals(request.matchId())) {
+            throw new IllegalArgumentException("Path matchId and body matchId must match");
+        }
         LiveStatsSavedResponse data = liveStatsService.saveLiveStats(request);
 
         return ResponseEntity
