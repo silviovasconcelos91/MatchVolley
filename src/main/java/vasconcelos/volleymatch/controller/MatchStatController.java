@@ -10,9 +10,13 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import vasconcelos.volleymatch.dto.common.ApiResponse;
+import vasconcelos.volleymatch.dto.live.LiveStatsSavedResponse;
+import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
+import vasconcelos.volleymatch.dto.live.LiveStatsResponse;
 import vasconcelos.volleymatch.dto.match.MatchDetailResponse;
 import vasconcelos.volleymatch.dto.match.MatchStatRequest;
 import vasconcelos.volleymatch.dto.match.MatchStatResponse;
+import vasconcelos.volleymatch.service.LiveStatsService;
 import vasconcelos.volleymatch.service.MatchStatService;
 
 @RestController
@@ -21,6 +25,7 @@ import vasconcelos.volleymatch.service.MatchStatService;
 public class MatchStatController {
 
     private final MatchStatService matchStatService;
+    private final LiveStatsService liveStatsService;
 
     @PostMapping("/match-stats")
     public ResponseEntity<ApiResponse<MatchStatResponse>> saveMatchStat(
@@ -46,6 +51,35 @@ public class MatchStatController {
         return ResponseEntity.ok(ApiResponse.<MatchDetailResponse>builder()
                 .data(data)
                 .message("Match stats retrieved successfully")
+                .status(HttpStatus.OK.value())
+                .build());
+    }
+
+    @PostMapping("/matches/{matchId}/live-stats")
+    public ResponseEntity<ApiResponse<LiveStatsSavedResponse>> saveLiveStats(
+            @PathVariable String matchId,
+            @RequestBody LiveStatsRequest request) {
+
+        LiveStatsSavedResponse data = liveStatsService.saveLiveStats(request);
+
+        return ResponseEntity
+                .status(HttpStatus.CREATED)
+                .body(ApiResponse.<LiveStatsSavedResponse>builder()
+                        .data(data)
+                        .message("Live stats saved successfully")
+                        .status(HttpStatus.CREATED.value())
+                        .build());
+    }
+
+    @GetMapping("/matches/{matchId}/live-stats")
+    public ResponseEntity<ApiResponse<LiveStatsResponse>> getLiveStats(
+            @PathVariable String matchId) {
+
+        LiveStatsResponse data = liveStatsService.getLiveStats(matchId);
+
+        return ResponseEntity.ok(ApiResponse.<LiveStatsResponse>builder()
+                .data(data)
+                .message("Live stats retrieved successfully")
                 .status(HttpStatus.OK.value())
                 .build());
     }
