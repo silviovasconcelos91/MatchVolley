@@ -3,13 +3,17 @@ package vasconcelos.volleymatch.service;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import vasconcelos.volleymatch.dto.live.LiveActionCountDto;
+import vasconcelos.volleymatch.dto.live.LiveActionStatsDto;
+import vasconcelos.volleymatch.dto.live.LiveAceZoneDto;
+import vasconcelos.volleymatch.dto.live.LiveAttackZoneDto;
+import vasconcelos.volleymatch.dto.live.LiveEventDto;
 import vasconcelos.volleymatch.dto.live.LiveMatchAnalysisResponse;
 import vasconcelos.volleymatch.dto.live.LivePlayerAnalysisDto;
-import vasconcelos.volleymatch.dto.live.LivePlayerSetAnalysisDto;
-import vasconcelos.volleymatch.dto.live.LiveSetAnalysisDto;
 import vasconcelos.volleymatch.dto.live.LivePlayerDto;
-import vasconcelos.volleymatch.dto.live.LiveEventDto;
-import vasconcelos.volleymatch.dto.match.StatsDto;
+import vasconcelos.volleymatch.dto.live.LivePlayerSetAnalysisDto;
+import vasconcelos.volleymatch.dto.live.LiveScopeStatsDto;
+import vasconcelos.volleymatch.dto.live.LiveSetAnalysisDto;
 import vasconcelos.volleymatch.dto.match.TimelineEntryDto;
 import vasconcelos.volleymatch.model.match.MatchLiveSession;
 import vasconcelos.volleymatch.model.match.MatchLiveSetEvent;
@@ -21,12 +25,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.stream.Collectors;
+import java.util.Set;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
 public class LiveStatsAnalysisService {
+
+    private static final Set<String> ATTACK_KEYS = Set.of("attack_pt", "attack_no_pt", "attack_fault");
 
     private final MatchLiveSessionRepository liveSessionRepository;
     private final AuthService authService;
@@ -41,48 +47,101 @@ public class LiveStatsAnalysisService {
                 .flatMap(s -> s.getEvents() == null ? java.util.stream.Stream.empty() : s.getEvents().stream())
                 .toList();
 
-        StatsDto globalStats = computeStats(allEvents);
-
         List<LiveSetAnalysisDto> sets = session.getSets().stream()
-                .map(se -> new LiveSetAnalysisDto(
-                        se.getSetNumber(),
-                        se.getScoreTeam(),
-                        se.getScoreOpp(),
-                        se.getWonBy(),
-                        computeStats(se.getEvents() == null ? List.of() : se.getEvents()),
-                        buildTimeline(se.getEvents() == null ? List.of() : se.getEvents())
-                ))
+                .map(se -> {
+                    List<LiveEventDto> events = se.getEvents() == null ? List.of() : se.getEvents();
+                    return new LiveSetAnalysisDto(
+                            se.getSetNumber(), se.getScoreTeam(), se.getScoreOpp(), se.getWonBy(),
+                            computeScopeStats(events),
+                            buildTimeline(events)
+                    );
+                })
                 .toList();
 
-        List<LivePlayerAnalysisDto> players = computePlayerAnalysis(session.getSets());
-
-        return new LiveMatchAnalysisResponse(session.getMatch().getId(), globalStats, sets, players);
+        return new LiveMatchAnalysisResponse(
+                session.getMatch().getId(),
+                computeScopeStats(allEvents),
+                sets,
+                computePlayerAnalysis(session.getSets())
+        );
     }
 
-    public StatsDto computeStats(List<LiveEventDto> events) {
-        if (events == null || events.isEmpty()) {
-            return new StatsDto(0, 0, 0, 0, 0, 0, 0, 0);
-        }
-        int points = 0, attackPoints = 0, blockPoints = 0, acePoints = 0;
-        int attackErrors = 0, serviceErrors = 0, receptions = 0, faults = 0;
+    public LiveScopeStatsDto computeScopeStats(List<LiveEventDto> events) {
+        List<LiveEventDto> mine = events.stream()
+                .filter(e -> "mine".equals(e.team()))
+                .toList();
+        return new LiveScopeStatsDto(
+                computeActions(mine),
+                computeAcesByZone(mine),
+                computeAttacks(mine)
+        );
+    }
 
-        for (LiveEventDto e : events) {
+    public LiveActionStatsDto computeActions(List<LiveEventDto> mineEvents) {
+        // First pass: count occurrences of each key and track label + category per key
+        Map<String, Integer> countByKey = new LinkedHashMap<>();
+        Map<String, String> labelByKey = new LinkedHashMap<>();
+        Map<String, String> categoryByKey = new LinkedHashMap<>();
+
+        for (LiveEventDto e : mineEvents) {
             if (e.action() == null) continue;
             String key = e.action().key();
-            String team = e.team();
-            String scoredFor = e.scoredFor();
-
-            if ("mine".equals(scoredFor)) points++;
-            if ("mine".equals(scoredFor) && "attack_pt".equals(key)) attackPoints++;
-            if ("mine".equals(scoredFor) && "block_pt".equals(key))  blockPoints++;
-            if ("mine".equals(scoredFor) && "ace".equals(key))       acePoints++;
-            if ("mine".equals(team) && "attack_fault".equals(key))   attackErrors++;
-            if ("mine".equals(team) && "serve_fault".equals(key))    serviceErrors++;
-            if ("mine".equals(team) && "good_recv".equals(key))      receptions++;
-            if ("mine".equals(team) && ("fault".equals(key) || "recv_fault".equals(key))) faults++;
+            countByKey.merge(key, 1, Integer::sum);
+            labelByKey.putIfAbsent(key, e.action().label());
+            categoryByKey.putIfAbsent(key, e.action().category());
         }
-        return new StatsDto(points, attackPoints, blockPoints, acePoints,
-                attackErrors, serviceErrors, receptions, faults);
+
+        List<LiveActionCountDto> points  = new ArrayList<>();
+        List<LiveActionCountDto> faults  = new ArrayList<>();
+        List<LiveActionCountDto> neutral = new ArrayList<>();
+
+        for (Map.Entry<String, Integer> entry : countByKey.entrySet()) {
+            String key = entry.getKey();
+            String category = categoryByKey.getOrDefault(key, "neutral");
+            LiveActionCountDto dto = new LiveActionCountDto(key, labelByKey.get(key), entry.getValue());
+            switch (category) {
+                case "point" -> points.add(dto);
+                case "fault" -> faults.add(dto);
+                default      -> neutral.add(dto);
+            }
+        }
+        return new LiveActionStatsDto(points, faults, neutral);
+    }
+
+    public List<LiveAceZoneDto> computeAcesByZone(List<LiveEventDto> mineEvents) {
+        Map<Integer, Integer> countByZone = new LinkedHashMap<>();
+        for (LiveEventDto e : mineEvents) {
+            if (e.action() == null || !"ace".equals(e.action().key())) continue;
+            if (e.trajectory() == null || e.trajectory().to() == null) continue;
+            countByZone.merge(e.trajectory().to(), 1, Integer::sum);
+        }
+        return countByZone.entrySet().stream()
+                .sorted(Map.Entry.comparingByKey())
+                .map(en -> new LiveAceZoneDto(en.getKey(), en.getValue()))
+                .toList();
+    }
+
+    public List<LiveAttackZoneDto> computeAttacks(List<LiveEventDto> mineEvents) {
+        record AttackKey(Integer playerPosition, Integer from, Integer to, String result) {}
+        Map<AttackKey, Integer> counts = new LinkedHashMap<>();
+
+        for (LiveEventDto e : mineEvents) {
+            if (e.action() == null || !ATTACK_KEYS.contains(e.action().key())) continue;
+            Integer playerPos = e.player() != null ? e.player().position() : null;
+            Integer from = e.trajectory() != null ? e.trajectory().from() : null;
+            Integer to   = e.trajectory() != null ? e.trajectory().to()   : null;
+            counts.merge(new AttackKey(playerPos, from, to, e.action().key()), 1, Integer::sum);
+        }
+
+        return counts.entrySet().stream()
+                .map(en -> new LiveAttackZoneDto(
+                        en.getKey().playerPosition(),
+                        en.getKey().from(),
+                        en.getKey().to(),
+                        en.getKey().result(),
+                        en.getValue()
+                ))
+                .toList();
     }
 
     public List<TimelineEntryDto> buildTimeline(List<LiveEventDto> events) {
@@ -93,7 +152,6 @@ public class LiveStatsAnalysisService {
             if (e.scoredFor() == null) continue;
             if ("mine".equals(e.scoredFor())) myScore++;
             else if ("opp".equals(e.scoredFor())) oppScore++;
-
             Long playerId = ("mine".equals(e.team()) && e.player() != null) ? e.player().id() : null;
             String action = e.action() != null ? e.action().key() : null;
             Instant occurredAt = e.ts() != null ? Instant.ofEpochMilli(e.ts()) : null;
@@ -105,7 +163,6 @@ public class LiveStatsAnalysisService {
     public List<LivePlayerAnalysisDto> computePlayerAnalysis(List<MatchLiveSetEvent> sets) {
         if (sets == null || sets.isEmpty()) return List.of();
 
-        // Collect all "mine" players with non-null id, preserving first encounter order
         Map<Long, LivePlayerDto> playerMap = new LinkedHashMap<>();
         for (MatchLiveSetEvent se : sets) {
             if (se.getEvents() == null) continue;
@@ -120,7 +177,6 @@ public class LiveStatsAnalysisService {
         for (Map.Entry<Long, LivePlayerDto> entry : playerMap.entrySet()) {
             Long playerId = entry.getKey();
             LivePlayerDto playerDto = entry.getValue();
-
             List<LivePlayerSetAnalysisDto> setStats = new ArrayList<>();
             List<LiveEventDto> allPlayerEvents = new ArrayList<>();
 
@@ -133,16 +189,13 @@ public class LiveStatsAnalysisService {
                         .toList();
                 allPlayerEvents.addAll(playerSetEvents);
                 if (!playerSetEvents.isEmpty()) {
-                    setStats.add(new LivePlayerSetAnalysisDto(se.getSetNumber(), computeStats(playerSetEvents)));
+                    setStats.add(new LivePlayerSetAnalysisDto(se.getSetNumber(), computeScopeStats(playerSetEvents)));
                 }
             }
 
             result.add(new LivePlayerAnalysisDto(
-                    playerId,
-                    playerDto.jersey(),
-                    playerDto.name(),
-                    computeStats(allPlayerEvents),
-                    setStats
+                    playerId, playerDto.jersey(), playerDto.name(),
+                    computeScopeStats(allPlayerEvents), setStats
             ));
         }
         return result;
