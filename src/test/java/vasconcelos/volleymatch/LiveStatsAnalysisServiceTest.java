@@ -66,7 +66,7 @@ class LiveStatsAnalysisServiceTest {
 
     private MatchLiveSetEvent setEvent(int setNum, List<LiveEventDto> events) {
         return MatchLiveSetEvent.builder()
-                .setNumber(setNum).scoreTeam(4).scoreOpp(2).wonBy("mine").events(events).build();
+                .set(setNum).scoreTeam(4).scoreOpp(2).wonBy("mine").events(events).build();
     }
 
     private MatchLiveSession sessionWith(String matchId, List<MatchLiveSetEvent> sets) {

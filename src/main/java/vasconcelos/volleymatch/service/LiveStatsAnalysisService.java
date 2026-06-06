@@ -51,7 +51,7 @@ public class LiveStatsAnalysisService {
                 .map(se -> {
                     List<LiveEventDto> events = se.getEvents() == null ? List.of() : se.getEvents();
                     return new LiveSetAnalysisDto(
-                            se.getSetNumber(), se.getScoreTeam(), se.getScoreOpp(), se.getWonBy(),
+                            se.getSet(), se.getScoreTeam(), se.getScoreOpp(), se.getWonBy(),
                             computeScopeStats(events),
                             buildTimeline(events)
                     );
@@ -189,7 +189,7 @@ public class LiveStatsAnalysisService {
                         .toList();
                 allPlayerEvents.addAll(playerSetEvents);
                 if (!playerSetEvents.isEmpty()) {
-                    setStats.add(new LivePlayerSetAnalysisDto(se.getSetNumber(), computeScopeStats(playerSetEvents)));
+                    setStats.add(new LivePlayerSetAnalysisDto(se.getSet(), computeScopeStats(playerSetEvents)));
                 }
             }
 

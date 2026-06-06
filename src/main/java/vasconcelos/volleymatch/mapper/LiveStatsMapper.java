@@ -43,6 +43,7 @@ public interface LiveStatsMapper {
 
     @Mapping(target = "id", ignore = true)
     @Mapping(target = "session", ignore = true)
+    @Mapping(target = "set", source = "setNumber")
     MatchLiveSetEvent toSetEventEntity(LiveSetDto dto);
 
     @Mapping(target = "matchId", source = "match.id")
@@ -52,6 +53,7 @@ public interface LiveStatsMapper {
     @Mapping(target = "sets", source = "sets")
     LiveStatsResponse toResponse(MatchLiveSession session);
 
+    @Mapping(target = "setNumber", source = "set")
     LiveSetDto toSetDto(MatchLiveSetEvent setEvent);
 
     @AfterMapping

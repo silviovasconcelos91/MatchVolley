@@ -40,7 +40,7 @@ public class MatchLiveSetEvent {
     private MatchLiveSession session;
 
     @Column(name = "set_number", nullable = false)
-    private Integer setNumber;
+    private Integer set;
 
     @Column(name = "score_team", nullable = false)
     private Integer scoreTeam;
