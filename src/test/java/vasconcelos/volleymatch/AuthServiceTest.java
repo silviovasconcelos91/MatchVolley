@@ -22,6 +22,7 @@ import vasconcelos.volleymatch.service.AuthService;
 import vasconcelos.volleymatch.service.EmailVerificationService;
 import vasconcelos.volleymatch.service.JwtService;
 import vasconcelos.volleymatch.service.RefreshTokenService;
+import vasconcelos.volleymatch.service.ResendEmailService;
 
 import java.time.LocalDateTime;
 import java.util.Optional;
@@ -44,6 +45,7 @@ class AuthServiceTest {
     @Mock private AuthenticationManager authenticationManager;
     @Mock private UserMapper userMapper;
     @Mock private EmailVerificationService emailVerificationService;
+    @Mock private ResendEmailService resendEmailService;
 
     @InjectMocks
     private AuthService authService;
@@ -58,6 +60,7 @@ class AuthServiceTest {
         when(passwordEncoder.encode("pass123")).thenReturn("hashed");
         when(appUserRepository.save(any())).thenReturn(saved);
         when(userMapper.toResponse(saved)).thenReturn(expected);
+        when(resendEmailService.isEnabled()).thenReturn(true);
 
         UserResponse result = authService.register(req);
 

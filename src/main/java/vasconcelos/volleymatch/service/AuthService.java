@@ -27,6 +27,7 @@ public class AuthService {
     private final AuthenticationManager authenticationManager;
     private final UserMapper userMapper;
     private final EmailVerificationService emailVerificationService;
+    private final ResendEmailService resendEmailService;
 
     @Transactional
     public UserResponse register(RegisterRequest request) {
@@ -40,7 +41,12 @@ public class AuthService {
                 .password(passwordEncoder.encode(request.password()))
                 .build();
         AppUser saved = appUserRepository.save(user);
-        emailVerificationService.sendVerification(saved);
+        if (!resendEmailService.isEnabled()) {
+            saved.setEmailVerified(true);
+            appUserRepository.save(saved);
+        } else {
+            emailVerificationService.sendVerification(saved);
+        }
         return userMapper.toResponse(saved);
     }
 
