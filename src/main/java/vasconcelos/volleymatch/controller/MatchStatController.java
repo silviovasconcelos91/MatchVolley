@@ -16,6 +16,8 @@ import vasconcelos.volleymatch.dto.live.LiveStatsResponse;
 import vasconcelos.volleymatch.dto.match.MatchDetailResponse;
 import vasconcelos.volleymatch.dto.match.MatchStatRequest;
 import vasconcelos.volleymatch.dto.match.MatchStatResponse;
+import vasconcelos.volleymatch.dto.live.LiveMatchAnalysisResponse;
+import vasconcelos.volleymatch.service.LiveStatsAnalysisService;
 import vasconcelos.volleymatch.service.LiveStatsService;
 import vasconcelos.volleymatch.service.MatchStatService;
 
@@ -26,6 +28,7 @@ public class MatchStatController {
 
     private final MatchStatService matchStatService;
     private final LiveStatsService liveStatsService;
+    private final LiveStatsAnalysisService liveStatsAnalysisService;
 
     @PostMapping("/match-stats")
     public ResponseEntity<ApiResponse<MatchStatResponse>> saveMatchStat(
@@ -83,6 +86,19 @@ public class MatchStatController {
         return ResponseEntity.ok(ApiResponse.<LiveStatsResponse>builder()
                 .data(data)
                 .message("Live stats retrieved successfully")
+                .status(HttpStatus.OK.value())
+                .build());
+    }
+
+    @GetMapping("/matches/{matchId}/live-stats/analysis")
+    public ResponseEntity<ApiResponse<LiveMatchAnalysisResponse>> getLiveStatsAnalysis(
+            @PathVariable String matchId) {
+
+        LiveMatchAnalysisResponse data = liveStatsAnalysisService.getMatchAnalysis(matchId);
+
+        return ResponseEntity.ok(ApiResponse.<LiveMatchAnalysisResponse>builder()
+                .data(data)
+                .message("Live stats analysis retrieved successfully")
                 .status(HttpStatus.OK.value())
                 .build());
     }
