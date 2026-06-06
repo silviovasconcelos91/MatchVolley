@@ -1,6 +1,5 @@
 package vasconcelos.volleymatch.dto.live;
 
-import vasconcelos.volleymatch.dto.match.StatsDto;
 import vasconcelos.volleymatch.dto.match.TimelineEntryDto;
 
 import java.util.List;
@@ -10,6 +9,6 @@ public record LiveSetAnalysisDto(
         Integer myScore,
         Integer oppScore,
         String wonBy,
-        StatsDto stats,
+        LiveScopeStatsDto stats,
         List<TimelineEntryDto> timeline
 ) {}
