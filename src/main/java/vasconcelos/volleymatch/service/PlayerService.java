@@ -114,8 +114,6 @@ public class PlayerService {
         if (request.name() != null) player.setName(request.name());
         if (request.roles() != null) player.setRoles(request.roles());
         if (request.numero() != null) player.setNumero(request.numero());
-        if (request.age() != null) player.setAge(request.age());
-        if (request.taille() != null) player.setTaille(request.taille());
         if (request.teamIds() != null) {
             List<Team> newTeams = teamRepository.findAllByIdInAndUser(request.teamIds(), user);
             if (newTeams.size() != request.teamIds().size()) {

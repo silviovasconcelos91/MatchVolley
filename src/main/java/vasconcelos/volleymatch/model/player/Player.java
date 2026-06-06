@@ -57,12 +57,6 @@ public class Player {
     @Column(name = "numero", nullable = false)
     private Integer numero;
 
-    @Column(name = "age", nullable = false)
-    private Integer age;
-
-    @Column(name = "taille", nullable = false, length = 10)
-    private String taille;
-
     @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", nullable = false)
     private AppUser user;

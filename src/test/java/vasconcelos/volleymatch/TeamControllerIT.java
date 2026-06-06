@@ -100,7 +100,7 @@ class TeamControllerIT extends BaseIT {
     private Long createPlayer(String name, Integer numero) {
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
                 "/api/v1/players", HttpMethod.POST,
-                authEntity(new CreatePlayerRequest(name, List.of(VolleyPosition.Libero), numero, 24, "180cm", List.of())),
+                authEntity(new CreatePlayerRequest(name, List.of(VolleyPosition.Libero), numero, List.of())),
                 new ParameterizedTypeReference<>() {});
         return response.getBody().data().id();
     }

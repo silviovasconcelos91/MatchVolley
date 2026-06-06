@@ -130,10 +130,10 @@ class PlayerServiceTest {
 
     @Test
     void should_returnAllPlayers_when_getAllPlayers() {
-        Player player1 = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).age(22).taille("172cm").build();
-        Player player2 = Player.builder().name("Bob").roles(List.of(VolleyPosition.Passeur)).numero(1).age(25).taille("188cm").build();
-        PlayerDto dto1 = new PlayerDto(1L, "Alice", List.of(VolleyPosition.Libero), 7, 22, "172cm", List.of());
-        PlayerDto dto2 = new PlayerDto(2L, "Bob", List.of(VolleyPosition.Passeur), 1, 25, "188cm", List.of());
+        Player player1 = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).build();
+        Player player2 = Player.builder().name("Bob").roles(List.of(VolleyPosition.Passeur)).numero(1).build();
+        PlayerDto dto1 = new PlayerDto(1L, "Alice", List.of(VolleyPosition.Libero), 7, List.of());
+        PlayerDto dto2 = new PlayerDto(2L, "Bob", List.of(VolleyPosition.Passeur), 1, List.of());
         when(playerRepository.findAllByUser(testUser)).thenReturn(List.of(player1, player2));
         when(playerMapper.toDto(player1)).thenReturn(dto1);
         when(playerMapper.toDto(player2)).thenReturn(dto2);
@@ -146,8 +146,8 @@ class PlayerServiceTest {
 
     @Test
     void should_returnPlayer_when_playerExists() {
-        Player player = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).age(22).taille("172cm").build();
-        PlayerDto dto = new PlayerDto(1L, "Alice", List.of(VolleyPosition.Libero), 7, 22, "172cm", List.of());
+        Player player = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).build();
+        PlayerDto dto = new PlayerDto(1L, "Alice", List.of(VolleyPosition.Libero), 7, List.of());
         when(playerRepository.findByIdAndUser(1L, testUser)).thenReturn(Optional.of(player));
         when(playerMapper.toDto(player)).thenReturn(dto);
 
@@ -167,9 +167,9 @@ class PlayerServiceTest {
 
     @Test
     void should_returnCreatedPlayer_when_createPlayerWithNoTeams() {
-        CreatePlayerRequest request = new CreatePlayerRequest("Charlie", List.of(VolleyPosition.Pointu), 14, 27, "195cm", List.of());
-        Player entity = Player.builder().name("Charlie").roles(List.of(VolleyPosition.Pointu)).numero(14).age(27).taille("195cm").build();
-        PlayerDto dto = new PlayerDto(3L, "Charlie", List.of(VolleyPosition.Pointu), 14, 27, "195cm", List.of());
+        CreatePlayerRequest request = new CreatePlayerRequest("Charlie", List.of(VolleyPosition.Pointu), 14, List.of());
+        Player entity = Player.builder().name("Charlie").roles(List.of(VolleyPosition.Pointu)).numero(14).build();
+        PlayerDto dto = new PlayerDto(3L, "Charlie", List.of(VolleyPosition.Pointu), 14, List.of());
         when(playerMapper.toEntity(request)).thenReturn(entity);
         when(playerRepository.save(any())).thenReturn(entity);
         when(playerMapper.toDto(entity)).thenReturn(dto);
@@ -183,12 +183,12 @@ class PlayerServiceTest {
 
     @Test
     void should_updatePlayerName_when_nameChanges() {
-        Player player = Player.builder().name("Old Name").roles(List.of(VolleyPosition.Libero)).numero(7).age(25).taille("180cm").build();
-        PlayerDto dto = new PlayerDto(1L, "New Name", List.of(VolleyPosition.Libero), 7, 25, "180cm", List.of());
+        Player player = Player.builder().name("Old Name").roles(List.of(VolleyPosition.Libero)).numero(7).build();
+        PlayerDto dto = new PlayerDto(1L, "New Name", List.of(VolleyPosition.Libero), 7, List.of());
         when(playerRepository.findByIdAndUser(1L, testUser)).thenReturn(Optional.of(player));
         when(playerMapper.toDto(player)).thenReturn(dto);
 
-        UpdatePlayerRequest request = new UpdatePlayerRequest("New Name", null, null, null, null, null);
+        UpdatePlayerRequest request = new UpdatePlayerRequest("New Name", null, null, null);
         PlayerDto result = playerService.updatePlayer(1L, request);
 
         assertThat(player.getName()).isEqualTo("New Name");
@@ -199,7 +199,7 @@ class PlayerServiceTest {
     void should_throwNoSuchElementException_when_updatePlayerNotFound() {
         when(playerRepository.findByIdAndUser(99L, testUser)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> playerService.updatePlayer(99L, new UpdatePlayerRequest(null, null, null, null, null, null)))
+        assertThatThrownBy(() -> playerService.updatePlayer(99L, new UpdatePlayerRequest(null, null, null, null)))
                 .isInstanceOf(NoSuchElementException.class);
     }
 

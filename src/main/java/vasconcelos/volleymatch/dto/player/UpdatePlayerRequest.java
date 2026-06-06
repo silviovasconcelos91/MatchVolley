@@ -8,7 +8,5 @@ public record UpdatePlayerRequest(
         String name,
         List<VolleyPosition> roles,
         Integer numero,
-        Integer age,
-        String taille,
         List<Long> teamIds
 ) {}

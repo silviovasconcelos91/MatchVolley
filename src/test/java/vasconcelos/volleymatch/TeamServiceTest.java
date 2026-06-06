@@ -162,7 +162,7 @@ class TeamServiceTest {
     @Test
     void should_addPlayerToTeam_when_assignPlayers() {
         Team team = Team.builder().name("Bordeaux").city("Bordeaux").logoColor("white").build();
-        Player player = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).age(22).taille("172cm").build();
+        Player player = Player.builder().name("Alice").roles(List.of(VolleyPosition.Libero)).numero(7).build();
         TeamDto dto = new TeamDto(2L, "Bordeaux", "Bordeaux", "white", List.of());
         when(teamRepository.findByIdAndUser(2L, testUser)).thenReturn(Optional.of(team));
         when(playerRepository.findAllByIdInAndUser(List.of(10L), testUser)).thenReturn(List.of(player));
@@ -186,7 +186,7 @@ class TeamServiceTest {
     @Test
     void should_removePlayerFromTeam_when_removePlayers() {
         Team team = Team.builder().name("Toulouse").city("Toulouse").logoColor("violet").build();
-        Player player = Player.builder().name("Bob").roles(List.of(VolleyPosition.Passeur)).numero(1).age(26).taille("190cm").build();
+        Player player = Player.builder().name("Bob").roles(List.of(VolleyPosition.Passeur)).numero(1).build();
         player.addTeam(team);
         TeamDto dto = new TeamDto(3L, "Toulouse", "Toulouse", "violet", List.of());
         when(teamRepository.findByIdAndUser(3L, testUser)).thenReturn(Optional.of(team));

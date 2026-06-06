@@ -27,7 +27,7 @@ class PlayerControllerIT extends BaseIT {
 
     @Test
     void should_return201AndCreatedPlayer_when_validRequestIsPosted() {
-        CreatePlayerRequest request = new CreatePlayerRequest("Jean Dupont", List.of(VolleyPosition.Libero), 7, 25, "185cm", List.of());
+        CreatePlayerRequest request = new CreatePlayerRequest("Jean Dupont", List.of(VolleyPosition.Libero), 7, List.of());
 
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
                 "/api/v1/players", HttpMethod.POST, authEntity(request),
@@ -58,7 +58,7 @@ class PlayerControllerIT extends BaseIT {
     void should_return200AndUpdatedName_when_validUpdateIsPosted() {
         Long playerId = createPlayer("Old Name", VolleyPosition.Libero, 9);
 
-        UpdatePlayerRequest updateRequest = new UpdatePlayerRequest("New Name", null, null, null, null, null);
+        UpdatePlayerRequest updateRequest = new UpdatePlayerRequest("New Name", null, null, null);
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
                 "/api/v1/players/" + playerId, HttpMethod.PUT, authEntity(updateRequest),
                 new ParameterizedTypeReference<>() {});
@@ -79,7 +79,7 @@ class PlayerControllerIT extends BaseIT {
     }
 
     private Long createPlayer(String name, VolleyPosition role, Integer numero) {
-        CreatePlayerRequest request = new CreatePlayerRequest(name, List.of(role), numero, 24, "182cm", List.of());
+        CreatePlayerRequest request = new CreatePlayerRequest(name, List.of(role), numero, List.of());
         ResponseEntity<ApiResponse<PlayerDto>> response = restTemplate.exchange(
                 "/api/v1/players", HttpMethod.POST, authEntity(request),
                 new ParameterizedTypeReference<>() {});

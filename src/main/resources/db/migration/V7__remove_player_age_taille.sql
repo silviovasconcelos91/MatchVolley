@@ -1,0 +1,2 @@
+ALTER TABLE players DROP COLUMN age;
+ALTER TABLE players DROP COLUMN taille;
