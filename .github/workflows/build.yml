@@ -17,7 +17,6 @@ jobs:
         with:
           java-version: '25'
           distribution: 'graalvm'
-          version: 'latest'
           native-image-job-reports: 'true'
 
       - name: Build native image
