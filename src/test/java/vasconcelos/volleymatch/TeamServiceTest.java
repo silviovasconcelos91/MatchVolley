@@ -12,7 +12,7 @@ import vasconcelos.volleymatch.dto.team.AssignPlayersRequest;
 import vasconcelos.volleymatch.dto.team.CreateTeamRequest;
 import vasconcelos.volleymatch.dto.team.RemovePlayersRequest;
 import vasconcelos.volleymatch.dto.team.TeamDto;
-import vasconcelos.volleymatch.mapper.MatchStatMapper;
+import vasconcelos.volleymatch.mapper.MatchMapper;
 import vasconcelos.volleymatch.mapper.TeamMapper;
 import vasconcelos.volleymatch.model.match.Match;
 import vasconcelos.volleymatch.model.match.MatchResult;
@@ -53,7 +53,7 @@ class TeamServiceTest {
     private TeamMapper teamMapper;
 
     @Mock
-    private MatchStatMapper matchStatMapper;
+    private MatchMapper matchMapper;
 
     @Mock
     private AuthService authService;
@@ -78,17 +78,17 @@ class TeamServiceTest {
         Match match = Match.builder()
                 .id("match-1").teamId(1L).date(LocalDate.of(2025, 10, 5))
                 .result(MatchResult.WON).mySets(3).oppSets(1).build();
-        MatchDto dto = new MatchDto("match-1", 1L, null, "2025/2026", null,
-                null, null, LocalDate.of(2025, 10, 5), "WON", 3, 1);
+        MatchDto dto = new MatchDto("match-1", 1L, "VSL vs Grenoble",
+                true, LocalDate.of(2025, 10, 5), "won", 3, 1);
         when(teamRepository.existsByIdAndUser(1L, testUser)).thenReturn(true);
         when(matchRepository.findByTeamIdAndUser(1L, testUser)).thenReturn(List.of(match));
-        when(matchStatMapper.toMatchDto(match)).thenReturn(dto);
+        when(matchMapper.toMatchDto(match)).thenReturn(dto);
 
         List<MatchDto> result = teamService.getMatchesByTeam(1L);
 
         assertThat(result).hasSize(1);
         assertThat(result.getFirst().id()).isEqualTo("match-1");
-        assertThat(result.getFirst().result()).isEqualTo("WON");
+        assertThat(result.getFirst().result()).isEqualTo("won");
     }
 
     @Test

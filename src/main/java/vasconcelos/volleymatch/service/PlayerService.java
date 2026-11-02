@@ -10,16 +10,19 @@ import vasconcelos.volleymatch.dto.player.PlayerSeasonStatsResponse;
 import vasconcelos.volleymatch.dto.player.PositionStatsDto;
 import vasconcelos.volleymatch.dto.player.UpdatePlayerRequest;
 import vasconcelos.volleymatch.mapper.PlayerMapper;
-import vasconcelos.volleymatch.model.match.PlayerMatchStat;
-import vasconcelos.volleymatch.model.match.PlayerSetStat;
-import vasconcelos.volleymatch.model.match.VolleyStats;
+import vasconcelos.volleymatch.dto.live.LiveEventDto;
+import vasconcelos.volleymatch.model.match.MatchLiveSession;
+import vasconcelos.volleymatch.model.match.MatchLiveSetEvent;
 import vasconcelos.volleymatch.model.player.Player;
 import vasconcelos.volleymatch.model.team.Team;
 import vasconcelos.volleymatch.model.user.AppUser;
-import vasconcelos.volleymatch.repository.PlayerMatchStatRepository;
+import vasconcelos.volleymatch.repository.MatchLiveSessionRepository;
 import vasconcelos.volleymatch.repository.PlayerRepository;
 import vasconcelos.volleymatch.repository.TeamRepository;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
@@ -33,7 +36,7 @@ public class PlayerService {
 
     private final PlayerRepository playerRepository;
     private final TeamRepository teamRepository;
-    private final PlayerMatchStatRepository playerMatchStatRepository;
+    private final MatchLiveSessionRepository liveSessionRepository;
     private final PlayerMapper playerMapper;
     private final AuthService authService;
 
@@ -45,35 +48,64 @@ public class PlayerService {
         if (!teamRepository.existsByIdAndUser(teamId, user)) {
             throw new NoSuchElementException("Team not found: " + teamId);
         }
-        List<PlayerMatchStat> matchStats = playerMatchStatRepository.findByPlayerIdAndMatchTeamId(playerId, teamId);
-        List<PlayerSetStat> allSetStats = matchStats.stream()
-                .flatMap(m -> m.getSetStats().stream()).toList();
-        StatsDto total = sumVolleyStats(matchStats.stream().map(PlayerMatchStat::getMatchStats).toList());
-        Map<String, PositionStatsDto> byPosition = matchStats.stream()
-                .flatMap(m -> m.getSetStats().stream()
-                        .filter(s -> s.getPosition() != null)
-                        .map(s -> Map.entry(m, s)))
-                .collect(Collectors.groupingBy(
-                        e -> e.getValue().getPosition().name(),
-                        Collectors.collectingAndThen(Collectors.toList(), entries -> new PositionStatsDto(
-                                (int) entries.stream().map(e -> e.getKey().getId()).distinct().count(),
-                                entries.size(),
-                                sumVolleyStats(entries.stream().map(e -> e.getValue().getStats()).toList())))));
-        return new PlayerSeasonStatsResponse(playerId, matchStats.size(), allSetStats.size(), total, byPosition);
+        List<MatchLiveSession> sessions = liveSessionRepository.findByMatch_TeamIdAndMatch_User(teamId, user);
+
+        int matchCount = 0;
+        int setCount = 0;
+        List<LiveEventDto> allEvents = new ArrayList<>();
+        Map<String, List<LiveEventDto>> eventsByPoste = new LinkedHashMap<>();
+        Map<String, Set<String>> matchesByPoste = new LinkedHashMap<>();
+        Map<String, Integer> setsByPoste = new LinkedHashMap<>();
+
+        for (MatchLiveSession session : sessions) {
+            boolean played = false;
+            for (MatchLiveSetEvent set : session.getSets()) {
+                List<LiveEventDto> playerEvents = playerEventsOf(set, playerId);
+                if (playerEvents.isEmpty()) continue;
+                played = true;
+                setCount++;
+                allEvents.addAll(playerEvents);
+                String poste = LiveStatsAnalysisService.posteOf(playerEvents);
+                if (poste != null) {
+                    eventsByPoste.computeIfAbsent(poste, k -> new ArrayList<>()).addAll(playerEvents);
+                    matchesByPoste.computeIfAbsent(poste, k -> new HashSet<>()).add(session.getMatch().getId());
+                    setsByPoste.merge(poste, 1, Integer::sum);
+                }
+            }
+            if (played) matchCount++;
+        }
+
+        Map<String, PositionStatsDto> byPosition = new LinkedHashMap<>();
+        eventsByPoste.forEach((poste, events) -> byPosition.put(poste, new PositionStatsDto(
+                matchesByPoste.get(poste).size(), setsByPoste.get(poste), toStats(events))));
+
+        return new PlayerSeasonStatsResponse(playerId, matchCount, setCount, toStats(allEvents), byPosition);
     }
 
-    private StatsDto sumVolleyStats(List<VolleyStats> statsList) {
+    private List<LiveEventDto> playerEventsOf(MatchLiveSetEvent set, Long playerId) {
+        if (set.getEvents() == null) return List.of();
+        return set.getEvents().stream()
+                .filter(e -> "mine".equals(e.team()) && e.player() != null && playerId.equals(e.player().id()))
+                .toList();
+    }
+
+    /** Aggregates live events into the season stats format. */
+    private StatsDto toStats(List<LiveEventDto> events) {
         int points = 0, attackPoints = 0, blockPoints = 0, acePoints = 0;
         int attackErrors = 0, serviceErrors = 0, receptions = 0, faults = 0;
-        for (VolleyStats s : statsList) {
-            if (s.getPoints() != null) points += s.getPoints();
-            if (s.getAttackPoints() != null) attackPoints += s.getAttackPoints();
-            if (s.getBlockPoints() != null) blockPoints += s.getBlockPoints();
-            if (s.getAcePoints() != null) acePoints += s.getAcePoints();
-            if (s.getAttackErrors() != null) attackErrors += s.getAttackErrors();
-            if (s.getServiceErrors() != null) serviceErrors += s.getServiceErrors();
-            if (s.getReceptions() != null) receptions += s.getReceptions();
-            if (s.getFaults() != null) faults += s.getFaults();
+        for (LiveEventDto e : events) {
+            if (e.action() == null) continue;
+            if ("point".equals(e.action().category())) points++;
+            if ("fault".equals(e.action().category())) faults++;
+            switch (e.action().key()) {
+                case "attack_pt" -> attackPoints++;
+                case "block_pt" -> blockPoints++;
+                case "ace" -> acePoints++;
+                case "attack_fault" -> attackErrors++;
+                case "serve_fault" -> serviceErrors++;
+                case "good_recv", "bad_recv", "recv_fault" -> receptions++;
+                default -> { }
+            }
         }
         return new StatsDto(points, attackPoints, blockPoints, acePoints, attackErrors, serviceErrors, receptions, faults);
     }

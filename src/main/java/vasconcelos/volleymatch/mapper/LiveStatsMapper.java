@@ -24,14 +24,7 @@ public interface LiveStatsMapper {
     @Mapping(target = "mySets", source = "setsWon.mine")
     @Mapping(target = "oppSets", source = "setsWon.opp")
     @Mapping(target = "result", expression = "java(request.setsWon().mine() > request.setsWon().opp() ? MatchResult.WON : MatchResult.LOST)")
-    @Mapping(target = "opponentId", ignore = true)
-    @Mapping(target = "seasonId", ignore = true)
-    @Mapping(target = "competitionId", ignore = true)
-    @Mapping(target = "title", ignore = true)
     @Mapping(target = "user", ignore = true)
-    @Mapping(target = "teamMatchStats", ignore = true)
-    @Mapping(target = "sets", ignore = true)
-    @Mapping(target = "players", ignore = true)
     Match toMatchEntity(LiveStatsRequest request);
 
     @Mapping(target = "id", ignore = true)
@@ -48,6 +41,7 @@ public interface LiveStatsMapper {
 
     @Mapping(target = "matchId", source = "match.id")
     @Mapping(target = "teamId", source = "match.teamId")
+    @Mapping(target = "title", source = "match.title")
     @Mapping(target = "venue", expression = "java(Boolean.TRUE.equals(session.getMatch().getHome()) ? \"home\" : \"away\")")
     @Mapping(target = "setsWon", expression = "java(new SetsWonDto(session.getSetsWonMine(), session.getSetsWonOpp()))")
     @Mapping(target = "sets", source = "sets")

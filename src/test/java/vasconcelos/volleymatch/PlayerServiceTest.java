@@ -11,18 +11,24 @@ import vasconcelos.volleymatch.dto.player.PlayerDto;
 import vasconcelos.volleymatch.dto.player.PlayerSeasonStatsResponse;
 import vasconcelos.volleymatch.dto.player.UpdatePlayerRequest;
 import vasconcelos.volleymatch.mapper.PlayerMapper;
-import vasconcelos.volleymatch.model.match.PlayerMatchStat;
-import vasconcelos.volleymatch.model.match.PlayerSetStat;
+import vasconcelos.volleymatch.dto.live.LiveActionDto;
+import vasconcelos.volleymatch.dto.live.LiveEventDto;
+import vasconcelos.volleymatch.dto.live.LivePlayerDto;
+import vasconcelos.volleymatch.model.match.Match;
+import vasconcelos.volleymatch.model.match.MatchLiveSession;
+import vasconcelos.volleymatch.model.match.MatchLiveSetEvent;
+import vasconcelos.volleymatch.model.match.MatchResult;
 import vasconcelos.volleymatch.model.match.VolleyPosition;
-import vasconcelos.volleymatch.model.match.VolleyStats;
 import vasconcelos.volleymatch.model.player.Player;
 import vasconcelos.volleymatch.model.user.AppUser;
-import vasconcelos.volleymatch.repository.PlayerMatchStatRepository;
+import vasconcelos.volleymatch.repository.MatchLiveSessionRepository;
 import vasconcelos.volleymatch.repository.PlayerRepository;
 import vasconcelos.volleymatch.repository.TeamRepository;
 import vasconcelos.volleymatch.service.AuthService;
 import vasconcelos.volleymatch.service.PlayerService;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -43,7 +49,7 @@ class PlayerServiceTest {
     private TeamRepository teamRepository;
 
     @Mock
-    private PlayerMatchStatRepository playerMatchStatRepository;
+    private MatchLiveSessionRepository liveSessionRepository;
 
     @Mock
     private PlayerMapper playerMapper;
@@ -63,50 +69,99 @@ class PlayerServiceTest {
         when(authService.getCurrentUser()).thenReturn(testUser);
     }
 
+    // ── season stats (computed from live events) ─────────────────────────────
+
+    private LiveEventDto liveEvent(String team, Long playerId, VolleyPosition poste, String key, String category) {
+        return new LiveEventDto("ev", 1, 0L, team,
+                new LivePlayerDto(playerId, 7, "Dupont", 4, poste),
+                new LiveActionDto(key, key, category), null, null);
+    }
+
+    private MatchLiveSession liveSession(String matchId, List<List<LiveEventDto>> eventsPerSet) {
+        Match match = Match.builder().id(matchId).teamId(1L).date(LocalDate.now())
+                .result(MatchResult.WON).mySets(2).oppSets(0).build();
+        List<MatchLiveSetEvent> sets = new java.util.ArrayList<>();
+        for (int i = 0; i < eventsPerSet.size(); i++) {
+            sets.add(MatchLiveSetEvent.builder().set(i + 1).scoreTeam(25).scoreOpp(20)
+                    .wonBy("mine").events(eventsPerSet.get(i)).build());
+        }
+        MatchLiveSession session = MatchLiveSession.builder().teamName("Les Lynx").recordedAt(Instant.now())
+                .setsWonMine(2).setsWonOpp(0).sets(sets).build();
+        session.setMatch(match);
+        return session;
+    }
+
     @Test
-    void should_returnSeasonStats_when_playerHasMatches() {
-        VolleyStats stats = new VolleyStats(10, 5, 2, 3, 1, 1, 8, 2);
-        PlayerSetStat setStat = PlayerSetStat.builder()
-                .set(1).position(VolleyPosition.Libero).stats(stats).build();
-        PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 42L, 7, VolleyPosition.Libero, stats, List.of(setStat));
+    void should_returnSeasonStats_when_playerHasLiveMatches() {
+        MatchLiveSession session = liveSession("m-1", List.of(
+                List.of(liveEvent("mine", 42L, VolleyPosition.Libero, "good_recv", "neutral"),
+                        liveEvent("mine", 42L, VolleyPosition.Libero, "ace", "point"),
+                        liveEvent("mine", 99L, VolleyPosition.R4, "attack_pt", "point"),
+                        liveEvent("opp", null, null, "attack_pt", "point")),
+                List.of(liveEvent("mine", 99L, VolleyPosition.R4, "attack_pt", "point"))));
         when(playerRepository.existsByIdAndUser(42L, testUser)).thenReturn(true);
         when(teamRepository.existsByIdAndUser(1L, testUser)).thenReturn(true);
-        when(playerMatchStatRepository.findByPlayerIdAndMatchTeamId(42L, 1L)).thenReturn(List.of(matchStat));
+        when(liveSessionRepository.findByMatch_TeamIdAndMatch_User(1L, testUser)).thenReturn(List.of(session));
 
         PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(42L, 1L);
 
         assertThat(result.playerId()).isEqualTo(42L);
         assertThat(result.matchCount()).isEqualTo(1);
         assertThat(result.setCount()).isEqualTo(1);
-        assertThat(result.totalStats().points()).isEqualTo(10);
-        assertThat(result.statsByPosition()).containsKey("Libero");
+        assertThat(result.totalStats().points()).isEqualTo(1);
+        assertThat(result.totalStats().acePoints()).isEqualTo(1);
+        assertThat(result.totalStats().receptions()).isEqualTo(1);
+        assertThat(result.totalStats().attackPoints()).isZero();
+        assertThat(result.statsByPosition()).containsOnlyKeys("Libero");
         assertThat(result.statsByPosition().get("Libero").matchCount()).isEqualTo(1);
         assertThat(result.statsByPosition().get("Libero").setCount()).isEqualTo(1);
-        assertThat(result.statsByPosition().get("Libero").stats().points()).isEqualTo(10);
     }
 
     @Test
     void should_aggregateStatsByPosition_when_playerHasMultiplePositions() {
-        VolleyStats liberoStats = new VolleyStats(5, 0, 0, 0, 0, 0, 10, 1);
-        VolleyStats r4Stats = new VolleyStats(8, 4, 1, 3, 1, 1, 2, 3);
-        PlayerSetStat liberoSet = PlayerSetStat.builder().set(1).position(VolleyPosition.Libero).stats(liberoStats).build();
-        PlayerSetStat r4Set = PlayerSetStat.builder().set(2).position(VolleyPosition.R4).stats(r4Stats).build();
-        VolleyStats matchTotal = new VolleyStats(13, 4, 1, 3, 1, 1, 12, 4);
-        PlayerMatchStat matchStat = new PlayerMatchStat(1L, null, 1L, 7, VolleyPosition.Libero, matchTotal, List.of(liberoSet, r4Set));
+        MatchLiveSession m1 = liveSession("m-1", List.of(
+                List.of(liveEvent("mine", 1L, VolleyPosition.Libero, "good_recv", "neutral"),
+                        liveEvent("mine", 1L, VolleyPosition.Libero, "recv_fault", "fault")),
+                List.of(liveEvent("mine", 1L, VolleyPosition.R4, "attack_pt", "point"),
+                        liveEvent("mine", 1L, VolleyPosition.R4, "attack_fault", "fault"))));
+        MatchLiveSession m2 = liveSession("m-2", List.of(
+                List.of(liveEvent("mine", 1L, VolleyPosition.R4, "block_pt", "point"),
+                        liveEvent("mine", 1L, VolleyPosition.R4, "serve_fault", "fault"))));
         when(playerRepository.existsByIdAndUser(1L, testUser)).thenReturn(true);
         when(teamRepository.existsByIdAndUser(2L, testUser)).thenReturn(true);
-        when(playerMatchStatRepository.findByPlayerIdAndMatchTeamId(1L, 2L)).thenReturn(List.of(matchStat));
+        when(liveSessionRepository.findByMatch_TeamIdAndMatch_User(2L, testUser)).thenReturn(List.of(m1, m2));
 
         PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(1L, 2L);
 
-        assertThat(result.setCount()).isEqualTo(2);
-        assertThat(result.statsByPosition()).hasSize(2);
+        assertThat(result.matchCount()).isEqualTo(2);
+        assertThat(result.setCount()).isEqualTo(3);
+        assertThat(result.totalStats().points()).isEqualTo(2);
+        assertThat(result.totalStats().faults()).isEqualTo(3);
+        assertThat(result.totalStats().attackErrors()).isEqualTo(1);
+        assertThat(result.totalStats().serviceErrors()).isEqualTo(1);
+        assertThat(result.totalStats().receptions()).isEqualTo(2);
+        assertThat(result.statsByPosition()).containsOnlyKeys("Libero", "R4");
         assertThat(result.statsByPosition().get("Libero").matchCount()).isEqualTo(1);
         assertThat(result.statsByPosition().get("Libero").setCount()).isEqualTo(1);
-        assertThat(result.statsByPosition().get("Libero").stats().receptions()).isEqualTo(10);
-        assertThat(result.statsByPosition().get("R4").matchCount()).isEqualTo(1);
-        assertThat(result.statsByPosition().get("R4").setCount()).isEqualTo(1);
-        assertThat(result.statsByPosition().get("R4").stats().attackPoints()).isEqualTo(4);
+        assertThat(result.statsByPosition().get("Libero").stats().receptions()).isEqualTo(2);
+        assertThat(result.statsByPosition().get("R4").matchCount()).isEqualTo(2);
+        assertThat(result.statsByPosition().get("R4").setCount()).isEqualTo(2);
+        assertThat(result.statsByPosition().get("R4").stats().attackPoints()).isEqualTo(1);
+        assertThat(result.statsByPosition().get("R4").stats().blockPoints()).isEqualTo(1);
+    }
+
+    @Test
+    void should_returnZeroStats_when_playerHasNoLiveEvents() {
+        when(playerRepository.existsByIdAndUser(1L, testUser)).thenReturn(true);
+        when(teamRepository.existsByIdAndUser(2L, testUser)).thenReturn(true);
+        when(liveSessionRepository.findByMatch_TeamIdAndMatch_User(2L, testUser)).thenReturn(List.of());
+
+        PlayerSeasonStatsResponse result = playerService.getPlayerSeasonStats(1L, 2L);
+
+        assertThat(result.matchCount()).isZero();
+        assertThat(result.setCount()).isZero();
+        assertThat(result.totalStats().points()).isZero();
+        assertThat(result.statsByPosition()).isEmpty();
     }
 
     @Test

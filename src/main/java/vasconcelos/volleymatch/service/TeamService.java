@@ -9,7 +9,7 @@ import vasconcelos.volleymatch.dto.team.AssignPlayersRequest;
 import vasconcelos.volleymatch.dto.team.CreateTeamRequest;
 import vasconcelos.volleymatch.dto.team.RemovePlayersRequest;
 import vasconcelos.volleymatch.dto.team.TeamDto;
-import vasconcelos.volleymatch.mapper.MatchStatMapper;
+import vasconcelos.volleymatch.mapper.MatchMapper;
 import vasconcelos.volleymatch.mapper.TeamMapper;
 import vasconcelos.volleymatch.model.player.Player;
 import vasconcelos.volleymatch.model.team.Team;
@@ -30,7 +30,7 @@ public class TeamService {
     private final PlayerRepository playerRepository;
     private final MatchRepository matchRepository;
     private final TeamMapper teamMapper;
-    private final MatchStatMapper matchStatMapper;
+    private final MatchMapper matchMapper;
     private final AuthService authService;
     private final EntityManager entityManager;
 
@@ -40,7 +40,7 @@ public class TeamService {
             throw new NoSuchElementException("Team not found: " + teamId);
         }
         return matchRepository.findByTeamIdAndUser(teamId, user).stream()
-                .map(matchStatMapper::toMatchDto)
+                .map(matchMapper::toMatchDto)
                 .toList();
     }
 

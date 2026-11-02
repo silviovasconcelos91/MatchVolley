@@ -7,6 +7,7 @@ public record LiveStatsRequest(
         String matchId,
         Long teamId,
         String teamName,
+        String title,
         String venue,
         Instant recordedAt,
         SetsWonDto setsWon,

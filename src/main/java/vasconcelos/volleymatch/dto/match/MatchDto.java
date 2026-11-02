@@ -5,9 +5,6 @@ import java.time.LocalDate;
 public record MatchDto(
         String id,
         Long teamId,
-        Long opponentId,
-        String seasonId,
-        Long competitionId,
         String title,
         Boolean home,
         LocalDate date,

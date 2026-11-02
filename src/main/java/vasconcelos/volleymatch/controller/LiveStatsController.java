@@ -13,50 +13,17 @@ import vasconcelos.volleymatch.dto.common.ApiResponse;
 import vasconcelos.volleymatch.dto.live.LiveStatsSavedResponse;
 import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
 import vasconcelos.volleymatch.dto.live.LiveStatsResponse;
-import vasconcelos.volleymatch.dto.match.MatchDetailResponse;
-import vasconcelos.volleymatch.dto.match.MatchStatRequest;
-import vasconcelos.volleymatch.dto.match.MatchStatResponse;
 import vasconcelos.volleymatch.dto.live.LiveMatchAnalysisResponse;
 import vasconcelos.volleymatch.service.LiveStatsAnalysisService;
 import vasconcelos.volleymatch.service.LiveStatsService;
-import vasconcelos.volleymatch.service.MatchStatService;
 
 @RestController
 @RequestMapping("/api/v1")
 @RequiredArgsConstructor
-public class MatchStatController {
+public class LiveStatsController {
 
-    private final MatchStatService matchStatService;
     private final LiveStatsService liveStatsService;
     private final LiveStatsAnalysisService liveStatsAnalysisService;
-
-    @PostMapping("/match-stats")
-    public ResponseEntity<ApiResponse<MatchStatResponse>> saveMatchStat(
-            @RequestBody MatchStatRequest request) {
-
-        MatchStatResponse data = matchStatService.saveMatchStat(request);
-
-        return ResponseEntity
-                .status(HttpStatus.CREATED)
-                .body(ApiResponse.<MatchStatResponse>builder()
-                        .data(data)
-                        .message("Match stats saved successfully")
-                        .status(HttpStatus.CREATED.value())
-                        .build());
-    }
-
-    @GetMapping("/match-stats/{matchId}")
-    public ResponseEntity<ApiResponse<MatchDetailResponse>> getMatchStat(
-            @PathVariable String matchId) {
-
-        MatchDetailResponse data = matchStatService.getMatchStat(matchId);
-
-        return ResponseEntity.ok(ApiResponse.<MatchDetailResponse>builder()
-                .data(data)
-                .message("Match stats retrieved successfully")
-                .status(HttpStatus.OK.value())
-                .build());
-    }
 
     @PostMapping("/matches/{matchId}/live-stats")
     public ResponseEntity<ApiResponse<LiveStatsSavedResponse>> saveLiveStats(

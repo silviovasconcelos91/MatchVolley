@@ -17,9 +17,14 @@ import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
 import vasconcelos.volleymatch.dto.live.LiveStatsResponse;
 import vasconcelos.volleymatch.dto.live.LiveTrajectoryDto;
 import vasconcelos.volleymatch.dto.live.SetsWonDto;
+import vasconcelos.volleymatch.dto.match.MatchDto;
+import vasconcelos.volleymatch.dto.team.CreateTeamRequest;
+import vasconcelos.volleymatch.dto.team.TeamDto;
+import vasconcelos.volleymatch.model.match.VolleyPosition;
 import vasconcelos.volleymatch.repository.MatchRepository;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -80,6 +85,43 @@ class LiveStatsControllerIT extends BaseIT {
         assertThat(data.setsWon().opp()).isEqualTo(1);
         assertThat(data.sets()).hasSize(1);
         assertThat(data.sets().getFirst().events()).hasSize(1);
+        assertThat(data.title()).isEqualTo("VSL vs Grenoble");
+        assertThat(data.sets().getFirst().events().getFirst().player().poste()).isEqualTo(VolleyPosition.R4);
+    }
+
+    @Test
+    void should_listLiveMatchWithTitle_when_getTeamMatches() {
+        ResponseEntity<ApiResponse<TeamDto>> team = restTemplate.exchange(
+                "/api/v1/teams", HttpMethod.POST,
+                authEntity(new CreateTeamRequest("Team live", "Lyon", "#000000")),
+                new ParameterizedTypeReference<>() {});
+        Long teamId = team.getBody().data().id();
+        restTemplate.exchange("/api/v1/matches/live-match-team-01/live-stats",
+                HttpMethod.POST, authEntity(buildValidRequest("live-match-team-01", teamId)), ApiResponse.class);
+
+        ResponseEntity<ApiResponse<List<MatchDto>>> response = restTemplate.exchange(
+                "/api/v1/teams/" + teamId + "/matches", HttpMethod.GET, authEntity(),
+                new ParameterizedTypeReference<>() {});
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody().data()).singleElement().satisfies(m -> {
+            assertThat(m.id()).isEqualTo("live-match-team-01");
+            assertThat(m.title()).isEqualTo("VSL vs Grenoble");
+            assertThat(m.home()).isTrue();
+            assertThat(m.date()).isEqualTo(LocalDate.of(2026, 6, 5));
+            assertThat(m.result()).isEqualTo("won");
+            assertThat(m.mySets()).isEqualTo(2);
+            assertThat(m.oppSets()).isEqualTo(1);
+        });
+    }
+
+    @Test
+    void should_return404_when_analysisRequestedForMatchWithoutLiveStats() {
+        ResponseEntity<ApiResponse> response = restTemplate.exchange(
+                "/api/v1/matches/no-live-stats/live-stats/analysis",
+                HttpMethod.GET, authEntity(), ApiResponse.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
     }
 
     @Test
@@ -125,16 +167,20 @@ class LiveStatsControllerIT extends BaseIT {
     }
 
     private LiveStatsRequest buildValidRequest(String matchId) {
+        return buildValidRequest(matchId, 42L);
+    }
+
+    private LiveStatsRequest buildValidRequest(String matchId, Long teamId) {
         LiveEventDto event = new LiveEventDto(
                 "ev-001", 1, 1749131100000L, "mine",
-                new LivePlayerDto(3L, 7, "Dupont", 4),
+                new LivePlayerDto(3L, 7, "Dupont", 4, VolleyPosition.R4),
                 new LiveActionDto("attack_pt", "Attaque", "point"),
                 new LiveTrajectoryDto(4, 1),
                 "mine"
         );
         LiveSetDto set = new LiveSetDto(1, 4, 2, "mine", List.of(event));
         return new LiveStatsRequest(
-                matchId, 42L, "Les Lynx", "home",
+                matchId, teamId, "Les Lynx", "VSL vs Grenoble", "home",
                 Instant.parse("2026-06-05T14:45:00.000Z"),
                 new SetsWonDto(2, 1),
                 List.of(set)

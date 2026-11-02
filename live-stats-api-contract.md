@@ -1,6 +1,6 @@
 # Live Stats — Contrat API
 
-Payload envoyée par l'app mobile (React Native / Expo) au backend Kotlin via **"Envoyer et terminer"** en mode saisie temps réel.
+Payload envoyée par l'app mobile (React Native / Expo) au backend (Java / Spring Boot) via **"Envoyer et terminer"** en mode saisie temps réel.
 
 ---
 
@@ -20,6 +20,7 @@ Content-Type: application/json
 | `matchId` | `string` | ID unique généré côté app (`String(Date.now())`) |
 | `teamId` | `number` | ID de l'équipe qui saisit |
 | `teamName` | `string` | Nom de l'équipe |
+| `title` | `string` | Nom du match saisi en début de match (ex. `"VSL vs Grenoble"`). Renvoyé tel quel par `GET /teams/{id}/matches` |
 | `venue` | `"home"` \| `"away"` | Domicile ou extérieur |
 | `recordedAt` | `string` ISO 8601 | Horodatage d'envoi |
 | `setsWon` | `{ mine: number, opp: number }` | Sets remportés (sets terminés uniquement) |
@@ -56,6 +57,7 @@ Content-Type: application/json
 | `jersey` | `number` | Numéro de maillot |
 | `name` | `string` | Nom complet ou `"Adv #N"` pour adversaire |
 | `position` | `number` \| `null` | Zone terrain 1–6 au moment de l'action |
+| `poste` | `"R4"` \| `"Central"` \| `"Passeur"` \| `"Pointu"` \| `"Libero"` \| `null` | Poste du joueur pendant le set. `null` pour l'adversaire. Sert à l'analyse par set et aux stats saison par poste. Valeur hors liste → 400 |
 
 ### `ActionPayload`
 
@@ -81,6 +83,7 @@ Content-Type: application/json
   "matchId": "1749131000000",
   "teamId": 42,
   "teamName": "Les Lynx",
+  "title": "Les Lynx vs Grenoble",
   "venue": "home",
   "recordedAt": "2026-06-06T14:45:00.000Z",
   "setsWon": { "mine": 1, "opp": 1 },
@@ -97,7 +100,7 @@ Content-Type: application/json
           "sequence": 1,
           "ts": 1749131100000,
           "team": "mine",
-          "player": { "id": 3, "jersey": 7, "name": "Dupont", "position": 4 },
+          "player": { "id": 3, "jersey": 7, "name": "Dupont", "position": 4, "poste": "R4" },
           "action": { "key": "attack_pt", "label": "Attaque", "category": "point" },
           "trajectory": { "from": 4, "to": 1 },
           "scoredFor": "mine"
@@ -107,7 +110,7 @@ Content-Type: application/json
           "sequence": 2,
           "ts": 1749131108000,
           "team": "mine",
-          "player": { "id": 5, "jersey": 12, "name": "Martin", "position": 1 },
+          "player": { "id": 5, "jersey": 12, "name": "Martin", "position": 1, "poste": "Passeur" },
           "action": { "key": "ace", "label": "Ace", "category": "point" },
           "trajectory": { "from": null, "to": 5 },
           "scoredFor": "mine"
@@ -117,7 +120,7 @@ Content-Type: application/json
           "sequence": 3,
           "ts": 1749131115000,
           "team": "opp",
-          "player": { "id": null, "jersey": 9, "name": "Adv #9", "position": 1 },
+          "player": { "id": null, "jersey": 9, "name": "Adv #9", "position": 1, "poste": null },
           "action": { "key": "attack_pt", "label": "Attaque", "category": "point" },
           "trajectory": { "from": 2, "to": 6 },
           "scoredFor": "opp"
@@ -127,7 +130,7 @@ Content-Type: application/json
           "sequence": 4,
           "ts": 1749131122000,
           "team": "mine",
-          "player": { "id": 8, "jersey": 4, "name": "Bernard", "position": 3 },
+          "player": { "id": 8, "jersey": 4, "name": "Bernard", "position": 3, "poste": "Central" },
           "action": { "key": "block_pt", "label": "Contre", "category": "point" },
           "trajectory": null,
           "scoredFor": "mine"
@@ -137,7 +140,7 @@ Content-Type: application/json
           "sequence": 5,
           "ts": 1749131130000,
           "team": "opp",
-          "player": { "id": null, "jersey": 5, "name": "Adv #5", "position": 4 },
+          "player": { "id": null, "jersey": 5, "name": "Adv #5", "position": 4, "poste": null },
           "action": { "key": "attack_pt", "label": "Attaque", "category": "point" },
           "trajectory": { "from": 4, "to": 1 },
           "scoredFor": "opp"
@@ -156,7 +159,7 @@ Content-Type: application/json
           "sequence": 1,
           "ts": 1749131200000,
           "team": "mine",
-          "player": { "id": 5, "jersey": 12, "name": "Martin", "position": 1 },
+          "player": { "id": 5, "jersey": 12, "name": "Martin", "position": 1, "poste": "Passeur" },
           "action": { "key": "serve_fault", "label": "Faute service", "category": "fault" },
           "trajectory": null,
           "scoredFor": "opp"
@@ -166,7 +169,7 @@ Content-Type: application/json
           "sequence": 2,
           "ts": 1749131208000,
           "team": "mine",
-          "player": { "id": 3, "jersey": 7, "name": "Dupont", "position": 4 },
+          "player": { "id": 3, "jersey": 7, "name": "Dupont", "position": 4, "poste": "R4" },
           "action": { "key": "attack_no_pt", "label": "Attaque (sans pt)", "category": "neutral" },
           "trajectory": { "from": 4, "to": 3 },
           "scoredFor": null
@@ -176,7 +179,7 @@ Content-Type: application/json
           "sequence": 3,
           "ts": 1749131215000,
           "team": "opp",
-          "player": { "id": null, "jersey": 3, "name": "Adv #3", "position": 3 },
+          "player": { "id": null, "jersey": 3, "name": "Adv #3", "position": 3, "poste": null },
           "action": { "key": "fault", "label": "Faute", "category": "fault" },
           "trajectory": null,
           "scoredFor": "mine"
@@ -186,7 +189,7 @@ Content-Type: application/json
           "sequence": 4,
           "ts": 1749131222000,
           "team": "mine",
-          "player": { "id": 2, "jersey": 2, "name": "Petit", "position": 5 },
+          "player": { "id": 2, "jersey": 2, "name": "Petit", "position": 5, "poste": "Libero" },
           "action": { "key": "recv_fault", "label": "Réception", "category": "fault" },
           "trajectory": null,
           "scoredFor": "opp"
@@ -196,7 +199,7 @@ Content-Type: application/json
           "sequence": 5,
           "ts": 1749131230000,
           "team": "opp",
-          "player": { "id": null, "jersey": 7, "name": "Adv #7", "position": 2 },
+          "player": { "id": null, "jersey": 7, "name": "Adv #7", "position": 2, "poste": null },
           "action": { "key": "attack_pt", "label": "Attaque", "category": "point" },
           "trajectory": { "from": 2, "to": 6 },
           "scoredFor": "opp"
@@ -215,7 +218,7 @@ Content-Type: application/json
           "sequence": 1,
           "ts": 1749131300000,
           "team": "mine",
-          "player": { "id": 11, "jersey": 9, "name": "Leclerc", "position": 1 },
+          "player": { "id": 11, "jersey": 9, "name": "Leclerc", "position": 1, "poste": "Pointu" },
           "action": { "key": "serve_in", "label": "Service réussi", "category": "neutral" },
           "trajectory": { "from": null, "to": 2 },
           "scoredFor": null
@@ -225,7 +228,7 @@ Content-Type: application/json
           "sequence": 2,
           "ts": 1749131307000,
           "team": "mine",
-          "player": { "id": 3, "jersey": 7, "name": "Dupont", "position": 4 },
+          "player": { "id": 3, "jersey": 7, "name": "Dupont", "position": 4, "poste": "R4" },
           "action": { "key": "attack_pt", "label": "Attaque", "category": "point" },
           "trajectory": { "from": 4, "to": 5 },
           "scoredFor": "mine"

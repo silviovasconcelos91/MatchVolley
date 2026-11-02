@@ -179,6 +179,7 @@ Chaque combinaison unique de `(playerPosition, from, to, result)` devient une en
     "setStats": [
       {
         "setNumber": 1,
+        "poste": "R4",
         "stats": {
           "actions": { ... },
           "acesByZone": [ ... ],
@@ -196,6 +197,7 @@ Chaque combinaison unique de `(playerPosition, from, to, result)` devient une en
 
 - `matchStats` = stats du joueur agrégées sur tout le match
 - `setStats` = breakdown par set (uniquement les sets où le joueur a agi)
+- `setStats[].poste` = poste du joueur dans le set (`R4`, `Central`, `Passeur`, `Pointu`, `Libero`), lu dans `player.poste` des events live du set. `null` si non renseigné
 - Seuls les joueurs `team == "mine"` apparaissent
 
 ---
@@ -398,6 +400,7 @@ interface SetAnalysis {
 
 interface PlayerSetStats {
   setNumber: number;
+  poste: "R4" | "Central" | "Passeur" | "Pointu" | "Libero" | null;
   stats: ScopeStats;
 }
 

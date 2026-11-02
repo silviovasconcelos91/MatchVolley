@@ -1,4 +1,4 @@
-package vasconcelos.volleymatch.dto.match;
+package vasconcelos.volleymatch.dto.live;
 
 import java.time.Instant;
 

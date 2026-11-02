@@ -42,6 +42,17 @@ class CorsIT {
     }
 
     @Test
+    void should_allowPreflightWithAuthorization_when_originIsExpoWebDevServer() {
+        ResponseEntity<String> resp = preflight("/api/v1/teams/1/matches", "http://localhost:8082");
+
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(resp.getHeaders().getAccessControlAllowOrigin()).isEqualTo("http://localhost:8082");
+        assertThat(resp.getHeaders().getAccessControlAllowHeaders())
+                .map(String::toLowerCase)
+                .contains("authorization");
+    }
+
+    @Test
     void should_rejectPreflight_when_originIsNotAllowed() {
         ResponseEntity<String> resp = preflight("/api/v1/players", "http://evil.example.com");
 

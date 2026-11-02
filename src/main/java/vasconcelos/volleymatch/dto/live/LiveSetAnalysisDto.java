@@ -1,6 +1,5 @@
 package vasconcelos.volleymatch.dto.live;
 
-import vasconcelos.volleymatch.dto.match.TimelineEntryDto;
 
 import java.util.List;
 

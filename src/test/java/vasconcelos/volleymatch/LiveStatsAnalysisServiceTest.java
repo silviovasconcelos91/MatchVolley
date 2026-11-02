@@ -15,12 +15,13 @@ import vasconcelos.volleymatch.dto.live.LiveMatchAnalysisResponse;
 import vasconcelos.volleymatch.dto.live.LivePlayerDto;
 import vasconcelos.volleymatch.dto.live.LiveScopeStatsDto;
 import vasconcelos.volleymatch.dto.live.LiveTrajectoryDto;
-import vasconcelos.volleymatch.dto.match.TimelineEntryDto;
+import vasconcelos.volleymatch.dto.live.TimelineEntryDto;
 import vasconcelos.volleymatch.model.match.Match;
 import vasconcelos.volleymatch.model.match.MatchLiveSession;
 import vasconcelos.volleymatch.model.match.MatchLiveSetEvent;
 import vasconcelos.volleymatch.model.match.MatchResult;
 import vasconcelos.volleymatch.model.user.AppUser;
+import vasconcelos.volleymatch.model.match.VolleyPosition;
 import vasconcelos.volleymatch.repository.MatchLiveSessionRepository;
 import vasconcelos.volleymatch.service.AuthService;
 import vasconcelos.volleymatch.service.LiveStatsAnalysisService;
@@ -34,6 +35,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.when;
+
 
 @ExtendWith(MockitoExtension.class)
 @MockitoSettings(strictness = Strictness.LENIENT)
@@ -57,11 +59,17 @@ class LiveStatsAnalysisServiceTest {
                                String scoredFor, Long playerId, Integer playerPos,
                                Integer trajFrom, Integer trajTo) {
         LivePlayerDto player = playerId != null
-                ? new LivePlayerDto(playerId, 7, "Dupont", playerPos)
-                : new LivePlayerDto(null, 5, "Adv #5", playerPos);
+                ? new LivePlayerDto(playerId, 7, "Dupont", playerPos, null)
+                : new LivePlayerDto(null, 5, "Adv #5", playerPos, null);
         LiveActionDto action = new LiveActionDto(key, label, category);
         LiveTrajectoryDto traj = (trajFrom != null || trajTo != null) ? new LiveTrajectoryDto(trajFrom, trajTo) : null;
         return new LiveEventDto("ev-" + seq, seq, 1000L * seq, team, player, action, traj, scoredFor);
+    }
+
+    private LiveEventDto mineEventWithPoste(int seq, String key, String category, Long playerId, VolleyPosition poste) {
+        return new LiveEventDto("ev-" + seq, seq, 1000L * seq, "mine",
+                new LivePlayerDto(playerId, 7, "Dupont", 4, poste),
+                new LiveActionDto(key, key, category), null, "point".equals(category) ? "mine" : null);
     }
 
     private MatchLiveSetEvent setEvent(int setNum, List<LiveEventDto> events) {
@@ -236,6 +244,28 @@ class LiveStatsAnalysisServiceTest {
         assertThat(players).hasSize(1);
         assertThat(players.get(0).matchStats().actions().points()).hasSize(2); // attack_pt + ace
         assertThat(players.get(0).setStats()).hasSize(2);
+    }
+
+    @Test
+    void should_includePoste_per_set_when_eventsCarryPoste() {
+        var se1 = setEvent(1, List.of(mineEventWithPoste(1, "attack_pt", "point", 3L, VolleyPosition.R4)));
+        var se2 = setEvent(2, List.of(mineEventWithPoste(1, "ace", "point", 3L, VolleyPosition.Passeur)));
+
+        var players = service.computePlayerAnalysis(List.of(se1, se2));
+        assertThat(players).hasSize(1);
+        var setStats = players.get(0).setStats();
+        assertThat(setStats).hasSize(2);
+        assertThat(setStats.get(0).poste()).isEqualTo("R4");
+        assertThat(setStats.get(1).poste()).isEqualTo("Passeur");
+    }
+
+    @Test
+    void should_returnNullPoste_when_eventsHaveNoPoste() {
+        var se = setEvent(1, List.of(event(1, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1)));
+
+        var players = service.computePlayerAnalysis(List.of(se));
+
+        assertThat(players.get(0).setStats().get(0).poste()).isNull();
     }
 
     // ── getMatchAnalysis ───────────────────────────────────────────────────────

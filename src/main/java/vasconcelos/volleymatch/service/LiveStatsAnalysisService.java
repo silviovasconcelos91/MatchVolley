@@ -14,7 +14,7 @@ import vasconcelos.volleymatch.dto.live.LivePlayerDto;
 import vasconcelos.volleymatch.dto.live.LivePlayerSetAnalysisDto;
 import vasconcelos.volleymatch.dto.live.LiveScopeStatsDto;
 import vasconcelos.volleymatch.dto.live.LiveSetAnalysisDto;
-import vasconcelos.volleymatch.dto.match.TimelineEntryDto;
+import vasconcelos.volleymatch.dto.live.TimelineEntryDto;
 import vasconcelos.volleymatch.model.match.MatchLiveSession;
 import vasconcelos.volleymatch.model.match.MatchLiveSetEvent;
 import vasconcelos.volleymatch.repository.MatchLiveSessionRepository;
@@ -189,7 +189,8 @@ public class LiveStatsAnalysisService {
                         .toList();
                 allPlayerEvents.addAll(playerSetEvents);
                 if (!playerSetEvents.isEmpty()) {
-                    setStats.add(new LivePlayerSetAnalysisDto(se.getSet(), computeScopeStats(playerSetEvents)));
+                    String poste = posteOf(playerSetEvents);
+                    setStats.add(new LivePlayerSetAnalysisDto(se.getSet(), poste, computeScopeStats(playerSetEvents)));
                 }
             }
 
@@ -199,5 +200,15 @@ public class LiveStatsAnalysisService {
             ));
         }
         return result;
+    }
+
+    /** Poste of a player within a set: first non-null poste found in their events, or null. */
+    public static String posteOf(List<LiveEventDto> playerSetEvents) {
+        return playerSetEvents.stream()
+                .map(LiveEventDto::player)
+                .filter(p -> p != null && p.poste() != null)
+                .map(p -> p.poste().name())
+                .findFirst()
+                .orElse(null);
     }
 }

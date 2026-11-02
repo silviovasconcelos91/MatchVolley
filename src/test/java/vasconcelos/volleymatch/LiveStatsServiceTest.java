@@ -96,7 +96,7 @@ class LiveStatsServiceTest {
     @Test
     void should_return_reconstructed_payload_when_match_exists() {
         LiveStatsResponse expected = new LiveStatsResponse(
-                "match-live-02", 42L, "Les Lynx", "home",
+                "match-live-02", 42L, "Les Lynx", "VSL vs Grenoble", "home",
                 Instant.now(), new SetsWonDto(2, 0), List.of());
         MatchLiveSession session = MatchLiveSession.builder()
                 .teamName("Les Lynx").recordedAt(Instant.now())
@@ -124,7 +124,7 @@ class LiveStatsServiceTest {
 
     private LiveStatsRequest buildRequest(String matchId, int mine, int opp) {
         return new LiveStatsRequest(
-                matchId, 42L, "Les Lynx", "home",
+                matchId, 42L, "Les Lynx", "VSL vs Grenoble", "home",
                 Instant.now(), new SetsWonDto(mine, opp), List.of());
     }
 
