@@ -7,8 +7,10 @@ import org.springframework.boot.resttestclient.autoconfigure.AutoConfigureTestRe
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.context.ActiveProfiles;
 import vasconcelos.volleymatch.dto.auth.AuthResponse;
@@ -46,6 +48,16 @@ class AuthControllerIT {
         RegisterRequest dup = new RegisterRequest("dup_email@test.com", "otheruser", "pass123");
         ResponseEntity<ApiResponse> resp = restTemplate.postForEntity("/api/v1/auth:register", dup, ApiResponse.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
+    }
+
+    @Test
+    void should_return400NotMasked401_when_registerWithMalformedJson() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        ResponseEntity<String> resp = restTemplate.exchange(
+                "/api/v1/auth:register", HttpMethod.POST,
+                new HttpEntity<>("{bad json", headers), String.class);
+        assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
     }
 
     @Test

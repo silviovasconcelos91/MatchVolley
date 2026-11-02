@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientException;
 
 import java.util.List;
 import java.util.Map;
@@ -47,13 +48,18 @@ public class ResendEmailService {
                 "html", "<p>Click <a href='" + verifyUrl + "'>here</a> to verify your account.</p>"
                         + "<p>This link expires in 24 hours.</p>"
         );
-        restClient.post()
-                .uri("https://api.resend.com/emails")
-                .header("Authorization", "Bearer " + apiKey)
-                .contentType(MediaType.APPLICATION_JSON)
-                .body(body)
-                .retrieve()
-                .toBodilessEntity();
+        try {
+            restClient.post()
+                    .uri("https://api.resend.com/emails")
+                    .header("Authorization", "Bearer " + apiKey)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(body)
+                    .retrieve()
+                    .toBodilessEntity();
+        } catch (RestClientException ex) {
+            // Do not fail the caller (e.g. registration): the user can request a new email later
+            log.error("Failed to send verification email via Resend: {}", ex.getMessage());
+        }
     }
 
     public boolean isEnabled() {
