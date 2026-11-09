@@ -99,7 +99,7 @@ class AuthControllerIT {
         ResponseEntity<ApiResponse> resp = restTemplate.postForEntity(
                 "/api/v1/auth:login", new LoginRequest("badpwd_it@test.com", "wrongpassword"), ApiResponse.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(resp.getBody().message()).isEqualTo("Mauvais email ou mdp");
+        assertThat(resp.getBody().message()).isEqualTo("Mauvais email ou mot de passe");
     }
 
     @Test
@@ -107,7 +107,7 @@ class AuthControllerIT {
         ResponseEntity<ApiResponse> resp = restTemplate.postForEntity(
                 "/api/v1/auth:login", new LoginRequest("nobody@nowhere.com", "pass123"), ApiResponse.class);
         assertThat(resp.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(resp.getBody().message()).isEqualTo("Mauvais email ou mdp");
+        assertThat(resp.getBody().message()).isEqualTo("Mauvais email ou mot de passe");
     }
 
     @Test
