@@ -103,7 +103,7 @@ Authorization: Bearer <token>
 Content-Type: application/json
 ```
 
-Envoyer **l'état complet** du match (undo compris) : le snapshot est remplacé, ce n'est pas un ajout d'event. `payload` suit le format `MatchLiveStatsPayload` (cf. `live-stats-api-contract.md`).
+Envoyer **l'état complet** du match (undo compris) : le snapshot est remplacé, ce n'est pas un ajout d'event. `payload` suit le format décrit en **Annexe — Format du `payload`** (même format que la soumission finale `POST /matches/{matchId}/live-stats`).
 
 ```json
 {
@@ -409,3 +409,97 @@ Retry-After: 37
 | `PUBLIC_WEB_URL` | `http://localhost:8081` | Base de `publicUrl` (`<PUBLIC_WEB_URL>/live/<code>`) |
 | `LIVE_RATE_LIMIT_PER_MINUTE` | `120` | Rate limit de l'endpoint public, par IP |
 | `CORS_ALLOWED_ORIGINS` | `http://localhost:*,http://127.0.0.1:*` | Doit inclure l'origine du front web |
+
+---
+
+## Annexe — Format du `payload`
+
+Utilisé par `PUT /live-sessions/{id}/snapshot` et par la soumission finale `POST /matches/{matchId}/live-stats`.
+
+### Champs racine
+
+| Champ | Type | Description |
+|---|---|---|
+| `matchId` | `string` | ID unique généré côté app (`String(Date.now())`) |
+| `teamId` | `number` | ID de l'équipe qui saisit |
+| `teamName` | `string` | Nom de l'équipe |
+| `title` | `string` | Nom du match saisi en début de match (ex. `"VSL vs Grenoble"`). Renvoyé tel quel par `GET /teams/{id}/matches` |
+| `venue` | `"home"` \| `"away"` | Domicile ou extérieur |
+| `recordedAt` | `string` ISO 8601 | Horodatage d'envoi |
+| `setsWon` | `{ mine: number, opp: number }` | Sets remportés (sets terminés uniquement) |
+| `sets` | `SetPayload[]` | Events regroupés par set, ordonnés par `setNumber` |
+
+### Objet `SetPayload`
+
+| Champ | Type | Description |
+|---|---|---|
+| `setNumber` | `number` | Numéro du set (1–5) |
+| `scoreTeam` | `number` | Points de mon équipe dans ce set (dérivé des events) |
+| `scoreOpp` | `number` | Points adversaire dans ce set (dérivé des events) |
+| `wonBy` | `"mine"` \| `"opp"` \| `null` | `null` si set en cours ou scores égaux |
+| `events` | `EventPayload[]` | Events du set, ordonnés par `sequence` (repart à 1 par set) |
+
+### Objet `EventPayload`
+
+| Champ | Type | Description |
+|---|---|---|
+| `id` | `string` | ID unique de l'event |
+| `sequence` | `number` | Ordre dans le set (commence à 1) |
+| `ts` | `number` | Timestamp UNIX ms (horloge locale app) |
+| `team` | `"mine"` \| `"opp"` | Équipe qui réalise l'action |
+| `player` | `PlayerPayload` | Joueur |
+| `action` | `ActionPayload` | Action réalisée |
+| `trajectory` | `TrajectoryPayload` \| `null` | `null` si action sans zone |
+| `scoredFor` | `"mine"` \| `"opp"` \| `null` | Règle : `point` → team, `fault` → adversaire, `neutral` → `null` |
+
+#### `PlayerPayload`
+
+| Champ | Type | Description |
+|---|---|---|
+| `id` | `number` \| `null` | ID interne (`null` pour adversaire) |
+| `jersey` | `number` | Numéro de maillot |
+| `name` | `string` | Nom complet ou `"Adv #N"` pour adversaire |
+| `position` | `number` \| `null` | Zone terrain 1–6 au moment de l'action |
+| `poste` | `"R4"` \| `"Central"` \| `"Passeur"` \| `"Pointu"` \| `"Libero"` \| `null` | Poste du joueur pendant le set. `null` pour l'adversaire. Sert à l'analyse par set et aux stats saison par poste. Valeur hors liste → 400 |
+
+#### `ActionPayload`
+
+| Champ | Type | Valeurs |
+|---|---|---|
+| `key` | `string` | `attack_pt`, `ace`, `block_pt`, `relance_pt`, `attack_fault`, `serve_fault`, `recv_fault`, `fault`, `good_recv`, `bad_recv`, `block_touch`, `serve_in`, `attack_no_pt` |
+| `label` | `string` | Label FR lisible |
+| `category` | `"point"` \| `"fault"` \| `"neutral"` | Catégorie |
+
+#### `TrajectoryPayload`
+
+| Champ | Type | Description |
+|---|---|---|
+| `from` | `number` \| `null` | Zone départ (1–6). `null` pour ace/service (pas de zone départ) |
+| `to` | `number` | Zone d'arrivée (1–6) |
+
+### Règles dérivées
+
+- `scoreTeam` / `scoreOpp` : comptés depuis les events (`scoredFor`). Backend peut recalculer.
+- `setsWon` : mis à jour uniquement quand "Set suivant" est validé. Le set en cours n'y figure pas encore.
+- `wonBy: null` : set encore en cours **ou** scores à égalité.
+- `sequence` repart à `1` à chaque nouveau set.
+- `trajectory.from: null` pour ace et service réussi (zone départ non saisie).
+- `player.id: null` pour tous les events adversaires.
+
+---
+
+### Zones terrain (numérotation FIVB)
+
+```
+                  ┌─────┬─────┬─────┐
+  ADVERSAIRE      │  4  │  3  │  2  │  (avant — proche du filet)
+                  ├─────┼─────┼─────┤
+                  │  5  │  6  │  1  │  (arrière)
+  ════════════════╪═════╪═════╪═════╡  ← FILET
+  MON ÉQUIPE      │  4  │  3  │  2  │  (avant — proche du filet)
+                  ├─────┼─────┼─────┤
+                  │  5  │  6  │  1  │  (arrière)
+                  └─────┴─────┴─────┘
+```
+
+`trajectory.from` = zone de l'équipe qui frappe · `trajectory.to` = zone adverse où la balle retombe
