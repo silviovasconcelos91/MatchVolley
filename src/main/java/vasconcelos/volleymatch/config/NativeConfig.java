@@ -1,6 +1,7 @@
 package vasconcelos.volleymatch.config;
 
 import java.util.UUID;
+import vasconcelos.volleymatch.model.live.LiveSessionHeader;
 import org.springframework.aot.hint.MemberCategory;
 import org.springframework.aot.hint.RuntimeHints;
 import org.springframework.aot.hint.RuntimeHintsRegistrar;
@@ -17,7 +18,9 @@ public class NativeConfig {
         public void registerHints(RuntimeHints hints, ClassLoader classLoader) {
             hints.reflection()
                     .registerType(UUID.class, MemberCategory.values())
-                    .registerType(UUID[].class, MemberCategory.values());
+                    .registerType(UUID[].class, MemberCategory.values())
+                    // JPQL constructor expression in LiveSessionRepository#findHeaderByCode
+                    .registerType(LiveSessionHeader.class, MemberCategory.INVOKE_PUBLIC_CONSTRUCTORS);
         }
     }
 }

@@ -22,15 +22,19 @@ import vasconcelos.volleymatch.repository.MatchLiveSessionRepository;
 import vasconcelos.volleymatch.repository.MatchRepository;
 import vasconcelos.volleymatch.service.AuthService;
 import vasconcelos.volleymatch.service.LiveStatsService;
+import vasconcelos.volleymatch.service.LiveSessionService;
 
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -49,6 +53,9 @@ class LiveStatsServiceTest {
 
     @Mock
     private AuthService authService;
+
+    @Mock
+    private LiveSessionService liveSessionService;
 
     @InjectMocks
     private LiveStatsService liveStatsService;
@@ -120,6 +127,34 @@ class LiveStatsServiceTest {
         assertThatThrownBy(() -> liveStatsService.getLiveStats("unknown"))
                 .isInstanceOf(NoSuchElementException.class)
                 .hasMessageContaining("unknown");
+    }
+
+    @Test
+    void should_attach_live_session_when_liveSessionId_present() {
+        UUID liveSessionId = UUID.randomUUID();
+        LiveStatsRequest base = buildRequest("match-live-attach", 2, 1);
+        LiveStatsRequest request = new LiveStatsRequest(base.matchId(), base.teamId(), base.teamName(), base.title(),
+                base.venue(), base.recordedAt(), base.setsWon(), base.sets(), liveSessionId);
+        Match match = buildMatch("match-live-attach", 2, 1, MatchResult.WON);
+        when(matchRepository.existsById("match-live-attach")).thenReturn(false);
+        when(liveStatsMapper.toMatchEntity(request)).thenReturn(match);
+        when(liveStatsMapper.toSessionEntity(request)).thenReturn(MatchLiveSession.builder().build());
+
+        liveStatsService.saveLiveStats(request);
+
+        verify(liveSessionService).attachMatch(liveSessionId, "match-live-attach", testUser);
+    }
+
+    @Test
+    void should_not_touch_live_sessions_when_liveSessionId_absent() {
+        LiveStatsRequest request = buildRequest("match-live-noattach", 2, 1);
+        when(matchRepository.existsById("match-live-noattach")).thenReturn(false);
+        when(liveStatsMapper.toMatchEntity(request)).thenReturn(buildMatch("match-live-noattach", 2, 1, MatchResult.WON));
+        when(liveStatsMapper.toSessionEntity(request)).thenReturn(MatchLiveSession.builder().build());
+
+        liveStatsService.saveLiveStats(request);
+
+        verify(liveSessionService, never()).attachMatch(any(), any(), any());
     }
 
     private LiveStatsRequest buildRequest(String matchId, int mine, int opp) {

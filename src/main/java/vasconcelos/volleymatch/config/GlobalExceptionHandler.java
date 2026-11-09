@@ -6,7 +6,11 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import vasconcelos.volleymatch.dto.common.ApiResponse;
+import vasconcelos.volleymatch.exception.BadRequestException;
 import vasconcelos.volleymatch.exception.EmailNotVerifiedException;
+import vasconcelos.volleymatch.exception.ForbiddenException;
+import vasconcelos.volleymatch.exception.LiveSessionEndedException;
+import vasconcelos.volleymatch.exception.PayloadTooLargeException;
 import vasconcelos.volleymatch.exception.RateLimitException;
 import vasconcelos.volleymatch.exception.TokenExpiredException;
 
@@ -62,6 +66,35 @@ public class GlobalExceptionHandler {
                         .data(null)
                         .message(ex.getMessage())
                         .status(HttpStatus.GONE.value())
+                        .build());
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ApiResponse<Void>> handleBadRequest(BadRequestException ex) {
+        return error(HttpStatus.BAD_REQUEST, ex.getMessage());
+    }
+
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ApiResponse<Void>> handleForbidden(ForbiddenException ex) {
+        return error(HttpStatus.FORBIDDEN, ex.getMessage());
+    }
+
+    @ExceptionHandler(LiveSessionEndedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleLiveSessionEnded(LiveSessionEndedException ex) {
+        return error(HttpStatus.CONFLICT, ex.getMessage());
+    }
+
+    @ExceptionHandler(PayloadTooLargeException.class)
+    public ResponseEntity<ApiResponse<Void>> handlePayloadTooLarge(PayloadTooLargeException ex) {
+        return error(HttpStatus.CONTENT_TOO_LARGE, ex.getMessage());
+    }
+
+    private ResponseEntity<ApiResponse<Void>> error(HttpStatus status, String message) {
+        return ResponseEntity.status(status)
+                .body(ApiResponse.<Void>builder()
+                        .data(null)
+                        .message(message)
+                        .status(status.value())
                         .build());
     }
 

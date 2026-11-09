@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -31,6 +33,8 @@ public class SecurityConfig {
     private final JwtAuthFilter jwtAuthFilter;
     private final UserDetailsServiceImpl userDetailsService;
 
+    private static final String PUBLIC_LIVE_PATH = "/api/v1/public/live/*";
+
     @Value("${app.cors.allowed-origins:http://localhost:*,http://127.0.0.1:*}")
     private List<String> allowedOrigins;
 
@@ -52,6 +56,7 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html"
                         ).permitAll()
+                        .requestMatchers(HttpMethod.GET, PUBLIC_LIVE_PATH).permitAll()
                         .anyRequest().authenticated()
                 )
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -73,7 +78,18 @@ public class SecurityConfig {
         config.setAllowCredentials(true);
         config.setMaxAge(3600L);
 
+        // Public overlay endpoints: read-only, no credentials, ETag exposed for conditional polling.
+        // Registered first: the first matching pattern wins.
+        CorsConfiguration publicConfig = new CorsConfiguration();
+        publicConfig.setAllowedOriginPatterns(allowedOrigins);
+        publicConfig.setAllowedMethods(List.of("GET", "OPTIONS"));
+        publicConfig.setAllowedHeaders(List.of(HttpHeaders.IF_NONE_MATCH, HttpHeaders.CONTENT_TYPE));
+        publicConfig.setExposedHeaders(List.of(HttpHeaders.ETAG));
+        publicConfig.setAllowCredentials(false);
+        publicConfig.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+        source.registerCorsConfiguration("/api/v1/public/**", publicConfig);
         source.registerCorsConfiguration("/**", config);
         return source;
     }

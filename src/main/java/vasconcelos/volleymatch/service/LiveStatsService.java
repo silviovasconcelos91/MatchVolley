@@ -24,6 +24,7 @@ public class LiveStatsService {
     private final MatchLiveSessionRepository liveSessionRepository;
     private final LiveStatsMapper liveStatsMapper;
     private final AuthService authService;
+    private final LiveSessionService liveSessionService;
 
     public LiveStatsSavedResponse saveLiveStats(LiveStatsRequest request) {
         if (matchRepository.existsById(request.matchId())) {
@@ -37,6 +38,10 @@ public class LiveStatsService {
         MatchLiveSession session = liveStatsMapper.toSessionEntity(request);
         session.setMatch(match);
         liveSessionRepository.save(session);
+
+        if (request.liveSessionId() != null) {
+            liveSessionService.attachMatch(request.liveSessionId(), match.getId(), user);
+        }
 
         return new LiveStatsSavedResponse(match.getId());
     }
