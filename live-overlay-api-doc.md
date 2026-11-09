@@ -394,6 +394,12 @@ Retry-After: 37
 | `404` | Code inconnu **ou** session expirée (même réponse) |
 | `429` | Trop de requêtes |
 
+**Réponse `404`**
+
+```json
+{ "data": null, "message": "Live not found", "status": 404 }
+```
+
 ---
 
 ## Configuration backend
