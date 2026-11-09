@@ -58,6 +58,16 @@ final class LiveSnapshotFixtures {
                 null, null);
     }
 
+    /**
+     * Timeout called by {@code team}: no player, no trajectory, no point.
+     */
+    static LiveEventDto timeout(int sequence, String team) {
+        return new LiveEventDto("ev-to-" + sequence, sequence, 1_000L + sequence, team,
+                null,
+                new LiveActionDto("timeout", "Temps mort", "neutral"),
+                null, null);
+    }
+
     static LiveSetDto set(int setNumber, String wonBy, List<LiveEventDto> events) {
         return new LiveSetDto(setNumber, 0, 0, wonBy, events);
     }

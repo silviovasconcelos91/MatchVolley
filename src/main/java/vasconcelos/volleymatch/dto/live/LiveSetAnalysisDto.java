@@ -9,5 +9,6 @@ public record LiveSetAnalysisDto(
         Integer oppScore,
         String wonBy,
         LiveScopeStatsDto stats,
-        List<TimelineEntryDto> timeline
+        List<TimelineEntryDto> timeline,
+        List<LiveTimeoutDto> timeouts
 ) {}

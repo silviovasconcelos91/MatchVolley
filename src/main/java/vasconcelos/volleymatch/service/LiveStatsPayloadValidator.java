@@ -23,6 +23,15 @@ public class LiveStatsPayloadValidator {
     private static final Set<String> TEAMS = Set.of(MINE, OPP);
     private static final Set<String> VENUES = Set.of("home", "away");
     private static final int MAX_SETS = 5;
+    static final String TIMEOUT_KEY = "timeout";
+    private static final String NEUTRAL = "neutral";
+
+    /**
+     * A timeout is a neutral event without player: it never scores and is excluded from action stats.
+     */
+    static boolean isTimeout(LiveEventDto event) {
+        return event != null && event.action() != null && TIMEOUT_KEY.equals(event.action().key());
+    }
 
     public void validate(LiveStatsRequest payload) {
         if (payload == null) {
@@ -77,12 +86,16 @@ public class LiveStatsPayloadValidator {
         if (event.team() == null || !TEAMS.contains(event.team())) {
             throw new BadRequestException(where + "team must be 'mine' or 'opp'");
         }
-        if (event.player() == null || event.player().jersey() == null) {
-            throw new BadRequestException(where + "player.jersey is required");
-        }
         LiveActionDto action = event.action();
         if (action == null || action.key() == null || action.category() == null) {
             throw new BadRequestException(where + "action.key and action.category are required");
+        }
+        if (isTimeout(event)) {
+            validateTimeout(where, event);
+            return;
+        }
+        if (event.player() == null || event.player().jersey() == null) {
+            throw new BadRequestException(where + "player.jersey is required");
         }
         String expectedScoredFor = switch (action.category()) {
             case "point" -> event.team();
@@ -92,6 +105,15 @@ public class LiveStatsPayloadValidator {
         };
         if (!Objects.equals(expectedScoredFor, event.scoredFor())) {
             throw new BadRequestException(where + "scoredFor inconsistent with action category '" + action.category() + "'");
+        }
+    }
+
+    private void validateTimeout(String where, LiveEventDto event) {
+        if (!NEUTRAL.equals(event.action().category()) || event.scoredFor() != null) {
+            throw new BadRequestException(where + "timeout must have category 'neutral' and scoredFor null");
+        }
+        if (event.trajectory() != null) {
+            throw new BadRequestException(where + "timeout must have trajectory null");
         }
     }
 }

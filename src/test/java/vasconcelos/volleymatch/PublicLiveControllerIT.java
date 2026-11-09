@@ -28,6 +28,7 @@ import static vasconcelos.volleymatch.LiveSnapshotFixtures.opponentPoint;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.set;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.simpleSnapshot;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.snapshot;
+import static vasconcelos.volleymatch.LiveSnapshotFixtures.timeout;
 
 class PublicLiveControllerIT extends LiveSessionITSupport {
 
@@ -52,6 +53,29 @@ class PublicLiveControllerIT extends LiveSessionITSupport {
         LiveSessionDto session = createSession(createTeam("Les Lynx", authToken), showNames);
         putSnapshot(session, 1, simpleSnapshot(), authToken);
         return session;
+    }
+
+    @Test
+    void should_show_timeout_banner_and_counter_until_next_event() {
+        LiveSessionDto session = createSession(createTeam("Timeouts", authToken), false);
+        putSnapshot(session, 1, snapshot(List.of(set(1, null, List.of(
+                attackPoint(1, 3L, 7, "Dupont"),
+                timeout(2, "mine"))))), authToken);
+
+        PublicLiveViewDto during = getPublic(session.code(), anonymous()).getBody().data();
+
+        putSnapshot(session, 2, snapshot(List.of(set(1, null, List.of(
+                attackPoint(1, 3L, 7, "Dupont"),
+                timeout(2, "mine"),
+                opponentPoint(3, 12))))), authToken);
+
+        PublicLiveViewDto after = getPublic(session.code(), anonymous()).getBody().data();
+
+        assertThat(during.currentSet().activeTimeout()).isEqualTo("mine");
+        assertThat(during.currentSet().timeouts()).isEqualTo(new ScoreDto(1, 0));
+        assertThat(after.currentSet().activeTimeout()).isNull();
+        assertThat(after.currentSet().timeouts()).isEqualTo(new ScoreDto(1, 0));
+        assertThat(after.currentSet().score()).isEqualTo(new ScoreDto(1, 1));
     }
 
     @Test

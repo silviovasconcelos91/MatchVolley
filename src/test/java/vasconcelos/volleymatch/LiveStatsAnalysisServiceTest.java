@@ -14,6 +14,7 @@ import vasconcelos.volleymatch.dto.live.LiveEventDto;
 import vasconcelos.volleymatch.dto.live.LiveMatchAnalysisResponse;
 import vasconcelos.volleymatch.dto.live.LivePlayerDto;
 import vasconcelos.volleymatch.dto.live.LiveScopeStatsDto;
+import vasconcelos.volleymatch.dto.live.LiveTimeoutDto;
 import vasconcelos.volleymatch.dto.live.LiveTrajectoryDto;
 import vasconcelos.volleymatch.dto.live.TimelineEntryDto;
 import vasconcelos.volleymatch.model.match.Match;
@@ -34,6 +35,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.when;
 
 
@@ -220,6 +222,72 @@ class LiveStatsAnalysisServiceTest {
                 event(1, "opp", "attack_pt", "point", "Attaque", "opp", null, 4, 4, 6)
         );
         assertThat(service.buildTimeline(events).get(0).playerId()).isNull();
+    }
+
+    // ── timeouts ───────────────────────────────────────────────────────────────
+
+    @Test
+    void should_placeTimeouts_after_points_played_with_score_at_call() {
+        var events = List.of(
+                LiveSnapshotFixtures.timeout(1, "mine"),
+                event(2, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1),
+                event(3, "opp",  "attack_pt", "point", "Attaque", "opp",  null, 4, 4, 6),
+                event(4, "opp",  "attack_pt", "point", "Attaque", "opp",  null, 4, 4, 6),
+                LiveSnapshotFixtures.timeout(5, "mine"),
+                event(6, "mine", "good_recv", "neutral", "Bonne réception", null, 3L, 4, null, null),
+                LiveSnapshotFixtures.timeout(7, "opp")
+        );
+
+        List<LiveTimeoutDto> timeouts = service.buildTimeouts(events);
+
+        assertThat(timeouts).containsExactly(
+                new LiveTimeoutDto("mine", 0, 0, 0, Instant.ofEpochMilli(1_001L)),
+                new LiveTimeoutDto("mine", 3, 1, 2, Instant.ofEpochMilli(1_005L)),
+                new LiveTimeoutDto("opp", 3, 1, 2, Instant.ofEpochMilli(1_007L)));
+    }
+
+    @Test
+    void should_returnEmptyTimeouts_when_noTimeoutCalled() {
+        var events = List.of(event(1, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1));
+        assertThat(service.buildTimeouts(events)).isEmpty();
+        assertThat(service.buildTimeouts(List.of())).isEmpty();
+    }
+
+    @Test
+    void should_keepTimeline_unchanged_when_timeoutsPresent() {
+        var events = List.of(
+                event(1, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1),
+                LiveSnapshotFixtures.timeout(2, "opp"),
+                event(3, "opp",  "attack_pt", "point", "Attaque", "opp",  null, 4, 4, 6)
+        );
+        assertThat(service.buildTimeline(events)).hasSize(2);
+    }
+
+    @Test
+    void should_excludeTimeouts_from_actionStats() {
+        var events = List.of(
+                event(1, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1),
+                LiveSnapshotFixtures.timeout(2, "mine")
+        );
+        var stats = service.computeScopeStats(events);
+        assertThat(stats.actions().neutral()).isEmpty();
+        assertThat(stats.actions().points()).extracting("key").containsExactly("attack_pt");
+    }
+
+    @Test
+    void should_includeTimeouts_per_set_when_analysisRequested() {
+        var events = List.of(
+                event(1, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1),
+                LiveSnapshotFixtures.timeout(2, "opp")
+        );
+        var sess = sessionWith("m-to", List.of(setEvent(1, events)));
+        when(liveSessionRepository.findByMatch_IdAndMatch_User("m-to", testUser)).thenReturn(Optional.of(sess));
+
+        LiveMatchAnalysisResponse result = service.getMatchAnalysis("m-to");
+
+        assertThat(result.sets().get(0).timeouts()).extracting(LiveTimeoutDto::team, LiveTimeoutDto::afterPoint)
+                .containsExactly(tuple("opp", 1));
+        assertThat(result.players()).hasSize(1);
     }
 
     // ── computePlayerAnalysis ──────────────────────────────────────────────────

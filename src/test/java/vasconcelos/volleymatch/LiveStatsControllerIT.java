@@ -10,8 +10,11 @@ import org.springframework.http.ResponseEntity;
 import vasconcelos.volleymatch.dto.common.ApiResponse;
 import vasconcelos.volleymatch.dto.live.LiveActionDto;
 import vasconcelos.volleymatch.dto.live.LiveEventDto;
+import vasconcelos.volleymatch.dto.live.LiveMatchAnalysisResponse;
 import vasconcelos.volleymatch.dto.live.LivePlayerDto;
+import vasconcelos.volleymatch.dto.live.LiveSetAnalysisDto;
 import vasconcelos.volleymatch.dto.live.LiveSetDto;
+import vasconcelos.volleymatch.dto.live.LiveTimeoutDto;
 import vasconcelos.volleymatch.dto.live.LiveStatsSavedResponse;
 import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
 import vasconcelos.volleymatch.dto.live.LiveStatsResponse;
@@ -164,6 +167,30 @@ class LiveStatsControllerIT extends BaseIT {
 
         assertThat(postResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
         assertThat(getResponse.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void should_return_timeout_markers_in_analysis_when_match_has_timeouts() {
+        LiveSetDto set = LiveSnapshotFixtures.set(1, null, List.of(
+                LiveSnapshotFixtures.attackPoint(1, 3L, 7, "Dupont"),
+                LiveSnapshotFixtures.opponentPoint(2, 12),
+                LiveSnapshotFixtures.timeout(3, "opp"),
+                LiveSnapshotFixtures.attackPoint(4, 3L, 7, "Dupont")));
+        LiveStatsRequest request = new LiveStatsRequest("live-match-timeout", 42L, "Les Lynx", "VSL vs Grenoble",
+                "home", Instant.parse("2026-06-05T14:45:00.000Z"), new SetsWonDto(0, 0), List.of(set));
+        restTemplate.exchange("/api/v1/matches/live-match-timeout/live-stats",
+                HttpMethod.POST, authEntity(request), ApiResponse.class);
+
+        ResponseEntity<ApiResponse<LiveMatchAnalysisResponse>> response = restTemplate.exchange(
+                "/api/v1/matches/live-match-timeout/live-stats/analysis",
+                HttpMethod.GET, authEntity(), new ParameterizedTypeReference<>() {});
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        LiveSetAnalysisDto analysedSet = response.getBody().data().sets().get(0);
+        assertThat(analysedSet.timeline()).hasSize(3);
+        assertThat(analysedSet.timeouts()).containsExactly(
+                new LiveTimeoutDto("opp", 2, 1, 1, Instant.ofEpochMilli(1_003L)));
+        assertThat(response.getBody().data().globalStats().actions().neutral()).isEmpty();
     }
 
     private LiveStatsRequest buildValidRequest(String matchId) {

@@ -14,6 +14,7 @@ import vasconcelos.volleymatch.dto.live.LivePlayerDto;
 import vasconcelos.volleymatch.dto.live.LivePlayerSetAnalysisDto;
 import vasconcelos.volleymatch.dto.live.LiveScopeStatsDto;
 import vasconcelos.volleymatch.dto.live.LiveSetAnalysisDto;
+import vasconcelos.volleymatch.dto.live.LiveTimeoutDto;
 import vasconcelos.volleymatch.dto.live.TimelineEntryDto;
 import vasconcelos.volleymatch.model.match.MatchLiveSession;
 import vasconcelos.volleymatch.model.match.MatchLiveSetEvent;
@@ -53,7 +54,8 @@ public class LiveStatsAnalysisService {
                     return new LiveSetAnalysisDto(
                             se.getSet(), se.getScoreTeam(), se.getScoreOpp(), se.getWonBy(),
                             computeScopeStats(events),
-                            buildTimeline(events)
+                            buildTimeline(events),
+                            buildTimeouts(events)
                     );
                 })
                 .toList();
@@ -68,7 +70,7 @@ public class LiveStatsAnalysisService {
 
     public LiveScopeStatsDto computeScopeStats(List<LiveEventDto> events) {
         List<LiveEventDto> mine = events.stream()
-                .filter(e -> "mine".equals(e.team()))
+                .filter(e -> "mine".equals(e.team()) && !LiveStatsPayloadValidator.isTimeout(e))
                 .toList();
         return new LiveScopeStatsDto(
                 computeActions(mine),
@@ -158,6 +160,27 @@ public class LiveStatsAnalysisService {
             timeline.add(new TimelineEntryDto(myScore, oppScore, playerId, action, occurredAt));
         }
         return timeline;
+    }
+
+    /**
+     * Timeout markers positioned against {@link #buildTimeline}: {@code afterPoint} is the number of
+     * scoring events before the timeout. Events are expected in sequence order (as stored).
+     */
+    public List<LiveTimeoutDto> buildTimeouts(List<LiveEventDto> events) {
+        if (events == null || events.isEmpty()) return List.of();
+        List<LiveTimeoutDto> timeouts = new ArrayList<>();
+        int myScore = 0, oppScore = 0;
+        for (LiveEventDto e : events) {
+            if (LiveStatsPayloadValidator.isTimeout(e)) {
+                Instant occurredAt = e.ts() != null ? Instant.ofEpochMilli(e.ts()) : null;
+                timeouts.add(new LiveTimeoutDto(e.team(), myScore + oppScore, myScore, oppScore, occurredAt));
+            } else if ("mine".equals(e.scoredFor())) {
+                myScore++;
+            } else if ("opp".equals(e.scoredFor())) {
+                oppScore++;
+            }
+        }
+        return timeouts;
     }
 
     public List<LivePlayerAnalysisDto> computePlayerAnalysis(List<MatchLiveSetEvent> sets) {

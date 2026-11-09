@@ -4,6 +4,8 @@ import org.junit.jupiter.api.Test;
 import vasconcelos.volleymatch.dto.live.LiveActionDto;
 import vasconcelos.volleymatch.dto.live.LiveEventDto;
 import vasconcelos.volleymatch.dto.live.LivePlayerDto;
+import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
+import vasconcelos.volleymatch.dto.live.LiveTrajectoryDto;
 import vasconcelos.volleymatch.exception.BadRequestException;
 import vasconcelos.volleymatch.service.LiveStatsPayloadValidator;
 
@@ -15,6 +17,7 @@ import static vasconcelos.volleymatch.LiveSnapshotFixtures.attackPoint;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.set;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.simpleSnapshot;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.snapshot;
+import static vasconcelos.volleymatch.LiveSnapshotFixtures.timeout;
 
 class LiveStatsPayloadValidatorTest {
 
@@ -102,5 +105,45 @@ class LiveStatsPayloadValidatorTest {
         assertThatThrownBy(() -> validator.validate(snapshot(List.of(set(1, null, List.of(noSequence))))))
                 .isInstanceOf(BadRequestException.class)
                 .hasMessageContaining("sequence");
+    }
+
+    @Test
+    void should_accept_when_timeout_has_no_player() {
+        LiveStatsRequest payload = snapshot(List.of(set(1, null, List.of(
+                attackPoint(1, 3L, 7, "Dupont"),
+                timeout(2, "opp"),
+                timeout(3, "mine")))));
+
+        assertThatCode(() -> validator.validate(payload)).doesNotThrowAnyException();
+    }
+
+    @Test
+    void should_reject_when_non_timeout_event_has_no_player() {
+        LiveEventDto noPlayer = new LiveEventDto("e1", 1, 1L, "mine", null,
+                new LiveActionDto("good_recv", "Bonne réception", "neutral"), null, null);
+
+        assertThatThrownBy(() -> validator.validate(snapshot(List.of(set(1, null, List.of(noPlayer))))))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("player.jersey");
+    }
+
+    @Test
+    void should_reject_when_timeout_category_is_not_neutral() {
+        LiveEventDto pointTimeout = new LiveEventDto("e1", 1, 1L, "mine", null,
+                new LiveActionDto("timeout", "Temps mort", "point"), null, "mine");
+
+        assertThatThrownBy(() -> validator.validate(snapshot(List.of(set(1, null, List.of(pointTimeout))))))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("timeout");
+    }
+
+    @Test
+    void should_reject_when_timeout_has_trajectory() {
+        LiveEventDto timeoutWithZone = new LiveEventDto("e1", 1, 1L, "mine", null,
+                new LiveActionDto("timeout", "Temps mort", "neutral"), new LiveTrajectoryDto(4, 1), null);
+
+        assertThatThrownBy(() -> validator.validate(snapshot(List.of(set(1, null, List.of(timeoutWithZone))))))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("trajectory");
     }
 }

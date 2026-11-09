@@ -43,8 +43,8 @@ Content-Type: application/json
 | `id` | `string` | ID unique de l'event |
 | `sequence` | `number` | Ordre dans le set (commence à 1) |
 | `ts` | `number` | Timestamp UNIX ms (horloge locale app) |
-| `team` | `"mine"` \| `"opp"` | Équipe qui réalise l'action |
-| `player` | `PlayerPayload` | Joueur |
+| `team` | `"mine"` \| `"opp"` | Équipe qui réalise l'action (pour un temps mort : l'équipe qui l'a demandé) |
+| `player` | `PlayerPayload` \| `null` | Joueur. `null` uniquement pour un temps mort (`action.key == "timeout"`) |
 | `action` | `ActionPayload` | Action réalisée |
 | `trajectory` | `TrajectoryPayload` \| `null` | `null` si action sans zone |
 | `scoredFor` | `"mine"` \| `"opp"` \| `null` | Règle : `point` → team, `fault` → adversaire, `neutral` → `null` |
@@ -63,7 +63,7 @@ Content-Type: application/json
 
 | Champ | Type | Valeurs |
 |---|---|---|
-| `key` | `string` | `attack_pt`, `ace`, `block_pt`, `relance_pt`, `attack_fault`, `serve_fault`, `recv_fault`, `fault`, `good_recv`, `bad_recv`, `block_touch`, `serve_in`, `attack_no_pt` |
+| `key` | `string` | `attack_pt`, `ace`, `block_pt`, `relance_pt`, `attack_fault`, `serve_fault`, `recv_fault`, `fault`, `good_recv`, `bad_recv`, `block_touch`, `serve_in`, `attack_no_pt`, `timeout` |
 | `label` | `string` | Label FR lisible |
 | `category` | `"point"` \| `"fault"` \| `"neutral"` | Catégorie |
 
@@ -250,6 +250,7 @@ Content-Type: application/json
 - `sequence` repart à `1` à chaque nouveau set.
 - `trajectory.from: null` pour ace et service réussi (zone départ non saisie).
 - `player.id: null` pour tous les events adversaires.
+- **Temps mort** : event `action: { key: "timeout", label: "Temps mort", category: "neutral" }`, `team` = équipe qui l'a demandé, `player: null`, `trajectory: null`, `scoredFor: null`. Placé à sa position dans la séquence du set. Ignoré dans le score et les stats d'actions.
 
 ---
 

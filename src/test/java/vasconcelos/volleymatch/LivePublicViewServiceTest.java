@@ -27,6 +27,7 @@ import static vasconcelos.volleymatch.LiveSnapshotFixtures.opponentPoint;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.set;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.simpleSnapshot;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.snapshot;
+import static vasconcelos.volleymatch.LiveSnapshotFixtures.timeout;
 
 class LivePublicViewServiceTest {
 
@@ -62,6 +63,58 @@ class LivePublicViewServiceTest {
                 new ScoreDto(0, 0), new ScoreDto(1, 0), new ScoreDto(1, 1), new ScoreDto(2, 1));
         assertThat(state.currentSet().score()).isEqualTo(new ScoreDto(2, 1));
         assertThat(state.lastPoints()).hasSize(3);
+    }
+
+    @Test
+    void should_count_timeouts_per_team_in_current_set_only() {
+        LiveStatsRequest snap = snapshot(List.of(
+                set(1, "mine", List.of(timeout(1, "mine"), attackPoint(2, 3L, 7, "Dupont"))),
+                set(2, null, List.of(
+                        timeout(1, "opp"),
+                        attackPoint(2, 3L, 7, "Dupont"),
+                        timeout(3, "opp"),
+                        opponentPoint(4, 12)))));
+
+        LiveMatchState state = compute(snap, true);
+
+        assertThat(state.currentSet().timeouts()).isEqualTo(new ScoreDto(0, 2));
+        assertThat(state.currentSet().activeTimeout()).isNull();
+    }
+
+    @Test
+    void should_set_active_timeout_when_last_event_of_current_set_is_timeout() {
+        LiveStatsRequest snap = snapshot(List.of(set(1, null, List.of(
+                attackPoint(1, 3L, 7, "Dupont"),
+                timeout(2, "mine")))));
+
+        LiveMatchState state = compute(snap, true);
+
+        assertThat(state.currentSet().activeTimeout()).isEqualTo("mine");
+        assertThat(state.currentSet().timeouts()).isEqualTo(new ScoreDto(1, 0));
+    }
+
+    @Test
+    void should_clear_active_timeout_when_any_event_follows_timeout() {
+        LiveStatsRequest snap = snapshot(List.of(set(1, null, List.of(
+                timeout(1, "opp"),
+                neutral(2, 4L, 1, "Martin")))));
+
+        assertThat(compute(snap, true).currentSet().activeTimeout()).isNull();
+    }
+
+    @Test
+    void should_ignore_timeouts_in_score_points_and_top_scorers() {
+        LiveStatsRequest snap = snapshot(List.of(set(1, null, List.of(
+                attackPoint(1, 3L, 7, "Dupont"),
+                timeout(2, "mine"),
+                timeout(3, "opp")))));
+
+        LiveMatchState state = compute(snap, true);
+
+        assertThat(state.currentSet().score()).isEqualTo(new ScoreDto(1, 0));
+        assertThat(state.currentSet().trajectory()).containsExactly(new ScoreDto(0, 0), new ScoreDto(1, 0));
+        assertThat(state.lastPoints()).hasSize(1);
+        assertThat(state.topScorers()).hasSize(1);
     }
 
     @Test

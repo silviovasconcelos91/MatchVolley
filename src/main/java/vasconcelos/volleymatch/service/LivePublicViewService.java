@@ -115,11 +115,25 @@ public class LivePublicViewService {
         for (LiveSetDto set : orderedSets) {
             int mine = 0;
             int opp = 0;
+            int timeoutsMine = 0;
+            int timeoutsOpp = 0;
             String lastScorer = null;
+            String activeTimeout = null;
             List<ScoreDto> trajectory = new ArrayList<>();
             trajectory.add(new ScoreDto(0, 0));
 
             for (LiveEventDto event : orderedEvents(set)) {
+                // Any event after a timeout ends it: only a trailing timeout stays active.
+                activeTimeout = null;
+                if (LiveStatsPayloadValidator.isTimeout(event)) {
+                    if (MINE.equals(event.team())) {
+                        timeoutsMine++;
+                    } else if (OPP.equals(event.team())) {
+                        timeoutsOpp++;
+                    }
+                    activeTimeout = event.team();
+                    continue;
+                }
                 if (event.scoredFor() == null) {
                     continue;
                 }
@@ -141,7 +155,8 @@ public class LivePublicViewService {
             } else if (OPP.equals(set.wonBy())) {
                 setsWonOpp++;
             }
-            currentSet = new PublicCurrentSetDto(set.setNumber(), score, lastScorer, trajectory);
+            currentSet = new PublicCurrentSetDto(set.setNumber(), score, lastScorer, trajectory,
+                    new ScoreDto(timeoutsMine, timeoutsOpp), activeTimeout);
         }
 
         return new LiveMatchState(
