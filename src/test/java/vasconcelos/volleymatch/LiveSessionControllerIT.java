@@ -2,6 +2,7 @@ package vasconcelos.volleymatch;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -34,6 +35,9 @@ class LiveSessionControllerIT extends LiveSessionITSupport {
 
     @Autowired
     private LiveSessionRepository liveSessionRepository;
+
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
 
     @Test
     void should_return201_with_code_and_public_url_when_team_is_owned() {
@@ -101,6 +105,20 @@ class LiveSessionControllerIT extends LiveSessionITSupport {
         LiveSession stored = liveSessionRepository.findById(session.sessionId()).orElseThrow();
         assertThat(stored.getRevision()).isEqualTo(17);
         assertThat(stored.getSnapshot()).isEqualTo(simpleSnapshot());
+    }
+
+    @Test
+    void should_store_snapshot_as_jsonb_object_when_applied() {
+        LiveSessionDto session = createSession(createTeam("Jsonb", authToken), false);
+
+        putSnapshot(session, 1, simpleSnapshot(), authToken);
+
+        String jsonType = jdbcTemplate.queryForObject(
+                "SELECT jsonb_typeof(snapshot) FROM live_sessions WHERE id = ?", String.class, session.sessionId());
+        String teamName = jdbcTemplate.queryForObject(
+                "SELECT snapshot ->> 'teamName' FROM live_sessions WHERE id = ?", String.class, session.sessionId());
+        assertThat(jsonType).isEqualTo("object");
+        assertThat(teamName).isEqualTo(simpleSnapshot().teamName());
     }
 
     @Test

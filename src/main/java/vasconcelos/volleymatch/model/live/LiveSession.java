@@ -1,6 +1,7 @@
 package vasconcelos.volleymatch.model.live;
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Convert;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -71,6 +72,7 @@ public class LiveSession {
     @Column(name = "revision", nullable = false)
     private long revision;
 
+    @Convert(converter = LiveStatsSnapshotConverter.class)
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "snapshot", columnDefinition = "jsonb")
     private LiveStatsRequest snapshot;
