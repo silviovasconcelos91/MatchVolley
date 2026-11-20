@@ -2,6 +2,7 @@ package vasconcelos.volleymatch;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -27,8 +28,15 @@ import vasconcelos.volleymatch.dto.match.MatchDto;
 import vasconcelos.volleymatch.dto.team.CreateTeamRequest;
 import vasconcelos.volleymatch.dto.team.TeamDto;
 import vasconcelos.volleymatch.model.match.VolleyPosition;
+import tools.jackson.databind.json.JsonMapper;
 import vasconcelos.volleymatch.repository.MatchRepository;
 
+import java.io.ByteArrayInputStream;
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -40,6 +48,9 @@ class LiveStatsControllerIT extends BaseIT {
 
     @Autowired
     private MatchRepository matchRepository;
+
+    @LocalServerPort
+    private int port;
 
     @Test
     void should_return201_and_persist_match_when_valid_payload_is_posted() {
@@ -373,6 +384,145 @@ class LiveStatsControllerIT extends BaseIT {
 
         assertThat(post.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         assertThat(get.getBody().data().sets().getFirst().events().getFirst().malusAmount()).isNull();
+    }
+
+    // ── taille du corps (MV-004) ──────────────────────────────────────────────
+
+
+    private static final int ONE_MEGABYTE = 1024 * 1024;
+    private static final String TOO_LARGE_MESSAGE = "Request body exceeds 1 MB";
+    private static final JsonMapper JSON = JsonMapper.builder().build();
+
+    @Test
+    void should_return413_envelope_and_persist_nothing_when_post_content_length_exceeds_one_megabyte() {
+        HttpHeaders headers = authHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        ResponseEntity<ApiResponse> post = restTemplate.exchange("/api/v1/matches/post-too-large/live-stats",
+                HttpMethod.POST, new HttpEntity<>(oversizedBody("post-too-large"), headers), ApiResponse.class);
+
+        assertTooLargeAndNotPersisted(post.getStatusCode().value(), post.getBody(), "post-too-large");
+    }
+
+    @Test
+    void should_return413_envelope_and_persist_nothing_when_chunked_post_exceeds_one_megabyte() throws Exception {
+        byte[] body = oversizedBody("post-chunked-too-large").getBytes(StandardCharsets.UTF_8);
+        HttpRequest request = HttpRequest.newBuilder(URI.create(
+                        "http://localhost:" + port + "/api/v1/matches/post-chunked-too-large/live-stats"))
+                .header("Authorization", "Bearer " + authToken)
+                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                // unknown length → HTTP/1.1 Transfer-Encoding: chunked, no Content-Length
+                .POST(HttpRequest.BodyPublishers.ofInputStream(() -> new ByteArrayInputStream(body)))
+                .version(HttpClient.Version.HTTP_1_1)
+                .build();
+
+        HttpResponse<String> response = send(request);
+
+        assertThat(request.bodyPublisher().orElseThrow().contentLength()).isNegative();
+        assertTooLargeAndNotPersisted(response.statusCode(), JSON.readValue(response.body(), ApiResponse.class),
+                "post-chunked-too-large");
+    }
+
+    /** CRIT-001: Spring MVC decodes {@code %61} → {@code a} and routes to the POST handler; the limit must follow. */
+    @Test
+    void should_return413_and_persist_nothing_when_post_path_is_percent_encoded_and_body_exceeds_one_megabyte()
+            throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(
+                        "http://localhost:" + port + "/api/v1/matches/post-encoded-too-large/live-st%61ts"))
+                .header("Authorization", "Bearer " + authToken)
+                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                .POST(HttpRequest.BodyPublishers.ofString(oversizedBody("post-encoded-too-large")))
+                .build();
+
+        HttpResponse<String> response = send(request);
+
+        assertThat(request.uri().getRawPath()).endsWith("/live-st%61ts");
+        assertTooLargeAndNotPersisted(response.statusCode(), JSON.readValue(response.body(), ApiResponse.class),
+                "post-encoded-too-large");
+    }
+
+    /** Guard for the rejection tests: the same encoded route really reaches the handler and persists (201). */
+    @Test
+    void should_return201_when_post_path_is_percent_encoded_and_body_is_under_one_megabyte() throws Exception {
+        HttpRequest request = HttpRequest.newBuilder(URI.create(
+                        "http://localhost:" + port + "/api/v1/matches/post-encoded-ok/live-st%61ts"))
+                .header("Authorization", "Bearer " + authToken)
+                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                .POST(HttpRequest.BodyPublishers.ofString(
+                        JSON.writeValueAsString(LiveSnapshotFixtures.realisticMatch("post-encoded-ok", 5, 100))))
+                .build();
+
+        HttpResponse<String> response = send(request);
+
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.CREATED.value());
+        assertThat(matchRepository.findById("post-encoded-ok")).isPresent();
+    }
+
+    @Test
+    void should_return201_when_posted_realistic_five_set_match_with_hundred_events_per_set() {
+        LiveStatsRequest request = LiveSnapshotFixtures.realisticMatch("post-realistic-5x100", 5, 100);
+
+        ResponseEntity<ApiResponse> post = restTemplate.exchange("/api/v1/matches/post-realistic-5x100/live-stats",
+                HttpMethod.POST, authEntity(request), ApiResponse.class);
+
+        assertThat(serializedSize(request)).isBetween(100_000, ONE_MEGABYTE);
+        assertThat(post.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(matchRepository.findById("post-realistic-5x100")).isPresent();
+    }
+
+    @Test
+    void should_return201_when_posted_extreme_match_of_ten_sets_with_three_hundred_events_per_set() {
+        LiveStatsRequest request = LiveSnapshotFixtures.realisticMatch("post-extreme-10x300", 10, 300);
+
+        ResponseEntity<ApiResponse> post = restTemplate.exchange("/api/v1/matches/post-extreme-10x300/live-stats",
+                HttpMethod.POST, authEntity(request), ApiResponse.class);
+
+        assertThat(serializedSize(request)).isLessThan(ONE_MEGABYTE);
+        assertThat(post.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(matchRepository.findById("post-extreme-10x300")).isPresent();
+    }
+
+    @Test
+    void should_return401_or_413_and_persist_nothing_when_unauthenticated_post_exceeds_one_megabyte() {
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        ResponseEntity<String> post = restTemplate.exchange("/api/v1/matches/post-unauth-too-large/live-stats",
+                HttpMethod.POST, new HttpEntity<>(oversizedBody("post-unauth-too-large"), headers), String.class);
+
+        assertThat(post.getStatusCode().value()).isIn(401, 413);
+        assertThat(matchRepository.findById("post-unauth-too-large")).isEmpty();
+    }
+
+    /**
+     * JSON of a valid, persistable match (short title, realistic events) that exceeds 1 MiB only by its number of
+     * events: without the size limit it would be stored (201), so "nothing persisted" is due to the limit.
+     */
+    private static String oversizedBody(String matchId) {
+        String body = JSON.writeValueAsString(LiveSnapshotFixtures.oversizedMatch(matchId));
+        assertThat(body.getBytes(StandardCharsets.UTF_8).length).isGreaterThan(ONE_MEGABYTE);
+        return body;
+    }
+
+    private static HttpResponse<String> send(HttpRequest request) throws Exception {
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            return client.send(request, HttpResponse.BodyHandlers.ofString());
+        }
+    }
+
+    private void assertTooLargeAndNotPersisted(int status, ApiResponse<?> envelope, String matchId) {
+        assertThat(status).isEqualTo(HttpStatus.CONTENT_TOO_LARGE.value());
+        assertThat(envelope.data()).isNull();
+        assertThat(envelope.status()).isEqualTo(413);
+        assertThat(envelope.message()).isEqualTo(TOO_LARGE_MESSAGE);
+        assertThat(matchRepository.findById(matchId)).isEmpty();
+        ResponseEntity<ApiResponse> get = restTemplate.exchange("/api/v1/matches/" + matchId + "/live-stats",
+                HttpMethod.GET, authEntity(), ApiResponse.class);
+        assertThat(get.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+    }
+
+    private static int serializedSize(LiveStatsRequest request) {
+        return JSON.writeValueAsBytes(request).length;
     }
 
     private LiveStatsRequest buildValidRequest(String matchId) {

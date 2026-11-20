@@ -2,6 +2,7 @@ package vasconcelos.volleymatch;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpEntity;
@@ -15,12 +16,19 @@ import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
 import vasconcelos.volleymatch.dto.live.SetsWonDto;
 import vasconcelos.volleymatch.dto.livesession.CreateLiveSessionRequest;
 import vasconcelos.volleymatch.dto.livesession.LiveSessionDto;
+import tools.jackson.databind.json.JsonMapper;
+import vasconcelos.volleymatch.dto.livesession.LiveSnapshotRequest;
 import vasconcelos.volleymatch.dto.livesession.LiveSnapshotResponse;
 import vasconcelos.volleymatch.dto.livesession.UpdateLiveSessionRequest;
 import vasconcelos.volleymatch.model.live.LiveSession;
 import vasconcelos.volleymatch.model.live.LiveSessionStatus;
 import vasconcelos.volleymatch.repository.LiveSessionRepository;
 
+import java.net.URI;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -40,6 +48,9 @@ class LiveSessionControllerIT extends LiveSessionITSupport {
 
     @Autowired
     private JdbcTemplate jdbcTemplate;
+
+    @LocalServerPort
+    private int port;
 
     @Test
     void should_return201_with_code_and_public_url_when_team_is_owned() {
@@ -236,11 +247,45 @@ class LiveSessionControllerIT extends LiveSessionITSupport {
         HttpHeaders headers = authHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
 
-        ResponseEntity<String> response = restTemplate.exchange(
+        ResponseEntity<ApiResponse> response = restTemplate.exchange(
                 "/api/v1/live-sessions/" + session.sessionId() + "/snapshot", HttpMethod.PUT,
-                new HttpEntity<>(body, headers), String.class);
+                new HttpEntity<>(body, headers), ApiResponse.class);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE);
+        assertTooLargeEnvelope(response.getBody());
+    }
+
+    /** CRIT-001: Spring MVC decodes {@code %61} → {@code a} and routes to the snapshot handler; the limit must follow. */
+    @Test
+    void should_return413_and_keep_snapshot_when_snapshot_path_is_percent_encoded_and_body_exceeds_one_megabyte()
+            throws Exception {
+        LiveSessionDto session = createSession(createTeam("Encoded too large", authToken), false);
+        String body = JsonMapper.builder().build().writeValueAsString(
+                new LiveSnapshotRequest(1L, LiveSnapshotFixtures.oversizedMatch("live-snap")));
+        HttpRequest request = HttpRequest.newBuilder(URI.create("http://localhost:" + port
+                        + "/api/v1/live-sessions/" + session.sessionId() + "/sn%61pshot"))
+                .header("Authorization", "Bearer " + authToken)
+                .header("Content-Type", MediaType.APPLICATION_JSON_VALUE)
+                .PUT(HttpRequest.BodyPublishers.ofString(body))
+                .build();
+
+        HttpResponse<String> response;
+        try (HttpClient client = HttpClient.newHttpClient()) {
+            response = client.send(request, HttpResponse.BodyHandlers.ofString());
+        }
+
+        assertThat(body.getBytes(StandardCharsets.UTF_8).length).isGreaterThan(1024 * 1024);
+        assertThat(response.statusCode()).isEqualTo(HttpStatus.CONTENT_TOO_LARGE.value());
+        assertTooLargeEnvelope(JsonMapper.builder().build().readValue(response.body(), ApiResponse.class));
+        LiveSession stored = liveSessionRepository.findById(session.sessionId()).orElseThrow();
+        assertThat(stored.getRevision()).isZero();
+        assertThat(stored.getSnapshot()).isNull();
+    }
+
+    private static void assertTooLargeEnvelope(ApiResponse<?> envelope) {
+        assertThat(envelope.data()).isNull();
+        assertThat(envelope.status()).isEqualTo(413);
+        assertThat(envelope.message()).isEqualTo("Request body exceeds 1 MB");
     }
 
     @Test

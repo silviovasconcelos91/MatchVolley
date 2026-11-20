@@ -2,13 +2,13 @@
 id: MV-004
 titre: Limiter à 1 Mo la taille du corps de POST live-stats
 type: dette
-statut: PRÊT
+statut: TERMINÉ
 priorite: moyenne
 cree: 2026-11-20
-maj: 2026-11-20
+maj: 2026-11-21
 depend_de: [MV-001]
-branche:
-debat:
+branche: feat/MV-004-limite-post-live-stats
+debat: docs/reviews/2026-11-21-MV-004-limite-post-live-stats/
 ---
 
 # MV-004 — Limiter à 1 Mo la taille du corps de POST live-stats
@@ -26,14 +26,14 @@ Dette relevée pendant la revue de MV-001 (`docs/reviews/2026-11-20-MV-001-event
 En tant qu'exploitant de l'API, je veux que la soumission finale d'un match ait la même limite de taille que le snapshot live, afin qu'un payload démesuré soit rejeté proprement (413) au lieu de saturer la mémoire du serveur.
 
 ## Critères d'acceptation
-- [ ] **CA-1** — Étant donné un `POST /api/v1/matches/{id}/live-stats` authentifié avec `Content-Length` > 1 Mo, quand la requête arrive, alors la réponse est 413 dans l'enveloppe `ApiResponse` (`{ data: null, message, status: 413 }`) et rien n'est persisté (`GET /matches/{id}/live-stats` → 404).
-- [ ] **CA-2** — Étant donné le même POST > 1 Mo envoyé en chunked (sans `Content-Length`), alors 413 et rien n'est persisté (même garde que `LimitedInputStream`).
-- [ ] **CA-3** — Étant donné un POST valide de taille réaliste (match de 5 sets, ~100 events par set), alors 201 (pas de régression).
-- [ ] **CA-4** — Le `PUT /live-sessions/{id}/snapshot` garde son comportement (`LiveSessionControllerIT#should_return413_when_snapshot_body_exceeds_one_megabyte` reste vert ; si le message est rendu générique, seule l'assertion de message est adaptée, pas l'intention du test).
-- [ ] **CA-5** — Étant donné un POST > 1 Mo sans JWT, alors la réponse est 401 ou 413 (jamais 500 ni 201).
-- [ ] **CA-6** — Les autres endpoints ne sont pas filtrés : un `GET /matches/{id}/live-stats` et un `POST /teams` ne passent pas par la limite (test unitaire du `shouldNotFilter` du filtre).
-- [ ] **CA-7** — Le filtre existant est étendu (même classe ou classe renommée), pas dupliqué : une seule implémentation de la limite de 1 Mo sous `src/main`.
-- [ ] **CA-8** — `live-stats-api-contract.md` documente le code `413` (« Body > 1 Mo, rien n'est enregistré ») dans le tableau des codes du POST.
+- [x] **CA-1** — Étant donné un `POST /api/v1/matches/{id}/live-stats` authentifié avec `Content-Length` > 1 Mo, quand la requête arrive, alors la réponse est 413 dans l'enveloppe `ApiResponse` (`{ data: null, message, status: 413 }`) et rien n'est persisté (`GET /matches/{id}/live-stats` → 404).
+- [x] **CA-2** — Étant donné le même POST > 1 Mo envoyé en chunked (sans `Content-Length`), alors 413 et rien n'est persisté (même garde que `LimitedInputStream`).
+- [x] **CA-3** — Étant donné un POST valide de taille réaliste (match de 5 sets, ~100 events par set), alors 201 (pas de régression).
+- [x] **CA-4** — Le `PUT /live-sessions/{id}/snapshot` garde son comportement (`LiveSessionControllerIT#should_return413_when_snapshot_body_exceeds_one_megabyte` reste vert ; si le message est rendu générique, seule l'assertion de message est adaptée, pas l'intention du test).
+- [x] **CA-5** — Étant donné un POST > 1 Mo sans JWT, alors la réponse est 401 ou 413 (jamais 500 ni 201).
+- [x] **CA-6** — Les autres endpoints ne sont pas filtrés : un `GET /matches/{id}/live-stats` et un `POST /teams` ne passent pas par la limite (test unitaire du `shouldNotFilter` du filtre).
+- [x] **CA-7** — Le filtre existant est étendu (même classe ou classe renommée), pas dupliqué : une seule implémentation de la limite de 1 Mo sous `src/main`.
+- [x] **CA-8** — `live-stats-api-contract.md` documente le code `413` (« Body > 1 Mo, rien n'est enregistré ») dans le tableau des codes du POST.
 
 ## Règles métier
 - Un event JSON fait de l'ordre de 300 octets (joueur, action, trajectoire) : 1 Mo représente environ 3 000 events, au-delà de 10 sets très longs (60 à 80 échanges et 150 à 300 events dans un set disputé, 2 points d'écart sans plafond). À vérifier par le développeur sur une fixture réelle (CA-3).
@@ -68,3 +68,6 @@ En tant qu'exploitant de l'API, je veux que la soumission finale d'un match ait 
 |---|---|---|
 | 2026-11-20 | BROUILLON | Création depuis la dette « limites d'entrée » (revue MV-001) |
 | 2026-11-20 | PRÊT | Réponses Q1 (POST seul, 1 Mo) et Q2 (pas de plafond d'events) intégrées ; titre recentré |
+| 2026-11-21 | EN COURS | Développement lancé via dev-debate (base 9e68a69) — exécution autonome autorisée par l'utilisateur |
+| 2026-11-21 | EN REVUE | Implémentation terminée (./mvnw test : 288 tests verts, vérifié orchestrateur), revue critic/perf/architect |
+| 2026-11-21 | TERMINÉ | Débat terminé : PRÊT, 2 rounds (bloquant CRIT-001 contournement par URI encodée corrigé), voir docs/reviews/2026-11-21-MV-004-limite-post-live-stats/SYNTHESE.md. Mergé sur master en local (autorisation utilisateur) |

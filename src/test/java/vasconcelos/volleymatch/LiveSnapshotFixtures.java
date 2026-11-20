@@ -106,6 +106,51 @@ final class LiveSnapshotFixtures {
         return sets;
     }
 
+    /**
+     * Match shaped like the app's payload (~317 bytes per event once serialized): per set, alternating my points
+     * (named player, trajectory), opponent points and neutral actions, with real-looking ids and epoch-ms timestamps.
+     * Valid and persistable: passes {@code LiveStatsPayloadValidator}, all strings fit their columns.
+     */
+    static LiveStatsRequest realisticMatch(String matchId, int setCount, int eventsPerSet) {
+        long ts = 1_749_131_100_000L;
+        List<LiveSetDto> sets = new ArrayList<>();
+        for (int setNumber = 1; setNumber <= setCount; setNumber++) {
+            List<LiveEventDto> events = new ArrayList<>();
+            for (int seq = 1; seq <= eventsPerSet; seq++) {
+                ts += 7_000L;
+                events.add(realisticEvent(seq, ts));
+            }
+            sets.add(set(setNumber, "mine", events));
+        }
+        return new LiveStatsRequest(matchId, 42L, "Les Lynx de Villeurbanne", "VSL vs Grenoble Volley Université",
+                "home", Instant.parse("2026-06-05T14:45:00.000Z"), new SetsWonDto(3, 2), sets);
+    }
+
+    /** Valid, persistable match whose JSON exceeds 1 MiB (10 sets × 360 events ≈ 1.14 MB): only the size is wrong. */
+    static LiveStatsRequest oversizedMatch(String matchId) {
+        return realisticMatch(matchId, 10, 360);
+    }
+
+    private static LiveEventDto realisticEvent(int seq, long ts) {
+        String id = "ev-" + ts + "-" + Long.toString(ts * 31 + seq, 36);
+        return switch (seq % 3) {
+            case 0 -> new LiveEventDto(id, seq, ts, "mine",
+                    new LivePlayerDto(1_000L + seq % 12, 10 + seq % 12, "Jean-Baptiste Dupont-Moreau", 1 + seq % 6,
+                            VolleyPosition.R4),
+                    new LiveActionDto("attack_pt", "Attaque gagnante", "point"),
+                    new LiveTrajectoryDto(1 + seq % 6, 1 + (seq + 2) % 6), "mine", null);
+            case 1 -> new LiveEventDto(id, seq, ts, "opp",
+                    new LivePlayerDto(null, 10 + seq % 12, "Adv #" + (10 + seq % 12), null, null),
+                    new LiveActionDto("attack_pt", "Attaque gagnante", "point"),
+                    new LiveTrajectoryDto(1 + seq % 6, 1 + (seq + 3) % 6), "opp", null);
+            default -> new LiveEventDto(id, seq, ts, "mine",
+                    new LivePlayerDto(2_000L + seq % 12, 1 + seq % 12, "Marie-Charlotte Lefebvre", 1 + seq % 6,
+                            VolleyPosition.Libero),
+                    new LiveActionDto("good_recv", "Bonne réception", "neutral"),
+                    new LiveTrajectoryDto(1 + seq % 6, 1 + (seq + 1) % 6), null, null);
+        };
+    }
+
     static LiveStatsRequest snapshot(List<LiveSetDto> sets) {
         return new LiveStatsRequest("live-snap", 1L, "Les Lynx", "Les Lynx vs Grenoble", "home",
                 Instant.parse("2026-11-05T19:00:00Z"), new SetsWonDto(0, 0), sets);

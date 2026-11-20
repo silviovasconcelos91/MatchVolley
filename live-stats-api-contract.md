@@ -17,6 +17,7 @@ Content-Type: application/json
 | `400` | Payload invalide : mêmes règles que `PUT /live-sessions/{id}/snapshot` (voir `live-overlay-api-doc.md`, « Règles de validation »), dont les règles du malus (voir « Règles dérivées »). Rien n'est enregistré |
 | `401` | Token absent ou invalide |
 | `409` | `matchId` déjà enregistré |
+| `413` | Body > 1 Mo, rien n'est enregistré (même limite que `PUT /live-sessions/{id}/snapshot`). Réponse : `{ "data": null, "message": "Request body exceeds 1 MB", "status": 413 }`. Un match réel en est loin (~320 octets par event, soit ~3 000 events) |
 
 ---
 
