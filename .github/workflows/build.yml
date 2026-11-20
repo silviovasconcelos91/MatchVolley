@@ -5,7 +5,44 @@ on:
     branches: [master]
 
 jobs:
+  # MV-003 : tests unitaires + d'intégration (*IT) en JVM avant tout build/déploiement.
+  # Aucun secret : application-test.properties + défauts de application.properties.
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    services:
+      postgres-test:
+        image: postgres:16
+        env:
+          POSTGRES_DB: volleymatch_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d volleymatch_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Run unit and integration tests
+        run: ./mvnw test --no-transfer-progress
+
   build-and-push:
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
