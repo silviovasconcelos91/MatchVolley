@@ -13,6 +13,7 @@ import vasconcelos.volleymatch.dto.live.LivePlayerAnalysisDto;
 import vasconcelos.volleymatch.dto.live.LivePlayerDto;
 import vasconcelos.volleymatch.dto.live.LivePlayerSetAnalysisDto;
 import vasconcelos.volleymatch.dto.live.LiveScopeStatsDto;
+import vasconcelos.volleymatch.dto.live.LiveScoreDto;
 import vasconcelos.volleymatch.dto.live.LiveSetAnalysisDto;
 import vasconcelos.volleymatch.dto.live.LiveTimeoutDto;
 import vasconcelos.volleymatch.dto.live.TimelineEntryDto;
@@ -55,7 +56,8 @@ public class LiveStatsAnalysisService {
                             se.getSet(), se.getScoreTeam(), se.getScoreOpp(), se.getWonBy(),
                             computeScopeStats(events),
                             buildTimeline(events),
-                            buildTimeouts(events)
+                            buildTimeouts(events),
+                            startScore(events)
                     );
                 })
                 .toList();
@@ -70,7 +72,9 @@ public class LiveStatsAnalysisService {
 
     public LiveScopeStatsDto computeScopeStats(List<LiveEventDto> events) {
         List<LiveEventDto> mine = events.stream()
-                .filter(e -> "mine".equals(e.team()) && !LiveStatsPayloadValidator.isTimeout(e))
+                .filter(e -> "mine".equals(e.team())
+                        && !LiveEventRules.isTimeout(e)
+                        && !LiveEventRules.isMalus(e))
                 .toList();
         return new LiveScopeStatsDto(
                 computeActions(mine),
@@ -146,10 +150,23 @@ public class LiveStatsAnalysisService {
                 .toList();
     }
 
+    /**
+     * Score at the start of a set: malus deducted, {@code {0, 0}} without malus.
+     */
+    public LiveScoreDto startScore(List<LiveEventDto> events) {
+        return new LiveScoreDto(
+                -LiveEventRules.malusOf(events, "mine"),
+                -LiveEventRules.malusOf(events, "opp"));
+    }
+
+    /**
+     * One entry per scoring event, cumulative score starting from {@link #startScore} (malus have no entry).
+     */
     public List<TimelineEntryDto> buildTimeline(List<LiveEventDto> events) {
         if (events == null || events.isEmpty()) return List.of();
         List<TimelineEntryDto> timeline = new ArrayList<>();
-        int myScore = 0, oppScore = 0;
+        LiveScoreDto start = startScore(events);
+        int myScore = start.myScore(), oppScore = start.oppScore();
         for (LiveEventDto e : events) {
             if (e.scoredFor() == null) continue;
             if ("mine".equals(e.scoredFor())) myScore++;
@@ -164,20 +181,25 @@ public class LiveStatsAnalysisService {
 
     /**
      * Timeout markers positioned against {@link #buildTimeline}: {@code afterPoint} is the number of
-     * scoring events before the timeout. Events are expected in sequence order (as stored).
+     * scoring events before the timeout (not the sum of the scores, which malus make lower); the scores start
+     * from {@link #startScore}. Events are expected in sequence order (as stored).
      */
     public List<LiveTimeoutDto> buildTimeouts(List<LiveEventDto> events) {
         if (events == null || events.isEmpty()) return List.of();
         List<LiveTimeoutDto> timeouts = new ArrayList<>();
-        int myScore = 0, oppScore = 0;
+        LiveScoreDto start = startScore(events);
+        int myScore = start.myScore(), oppScore = start.oppScore();
+        int pointsPlayed = 0;
         for (LiveEventDto e : events) {
-            if (LiveStatsPayloadValidator.isTimeout(e)) {
+            if (LiveEventRules.isTimeout(e)) {
                 Instant occurredAt = e.ts() != null ? Instant.ofEpochMilli(e.ts()) : null;
-                timeouts.add(new LiveTimeoutDto(e.team(), myScore + oppScore, myScore, oppScore, occurredAt));
+                timeouts.add(new LiveTimeoutDto(e.team(), pointsPlayed, myScore, oppScore, occurredAt));
             } else if ("mine".equals(e.scoredFor())) {
                 myScore++;
+                pointsPlayed++;
             } else if ("opp".equals(e.scoredFor())) {
                 oppScore++;
+                pointsPlayed++;
             }
         }
         return timeouts;

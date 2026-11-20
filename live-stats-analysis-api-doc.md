@@ -135,6 +135,7 @@ Chaque combinaison unique de `(playerPosition, from, to, result)` devient une en
     "myScore": 25,
     "oppScore": 21,
     "wonBy": "mine",
+    "startScore": { "myScore": 0, "oppScore": 0 },
     "stats": {
       "actions": { ... },
       "acesByZone": [ ... ],
@@ -162,7 +163,22 @@ Chaque combinaison unique de `(playerPosition, from, to, result)` devient une en
 | `action` | `string` | Clé de l'action |
 | `occurredAt` | `string` ISO 8601 | Timestamp |
 
-> Tracer `myScore` et `oppScore` en fonction de l'index pour la courbe de progression.
+> Tracer `myScore` et `oppScore` en fonction de l'index pour la courbe de progression, en partant de `startScore`.
+
+> **Malus** : les scores cumulés sont malus déduits (ils partent de `startScore`, et peuvent être négatifs). Un malus n'est pas un point : il n'a **pas** d'entrée dans `timeline`. Ex. malus -2 `mine` puis un point `mine` → `timeline[0]` = `{ myScore: -1, oppScore: 0 }`.
+
+#### `startScore` — score de départ du set
+
+```json
+"startScore": { "myScore": -2, "oppScore": 0 }
+```
+
+| Champ | Type | Description |
+|---|---|---|
+| `myScore` | `number` | Score de départ de mon équipe : `-malusAmount` si mon équipe a un malus dans ce set, sinon `0` |
+| `oppScore` | `number` | Score de départ adversaire : `-malusAmount` si l'adversaire a un malus dans ce set, sinon `0` |
+
+> Toujours présent : `{ myScore: 0, oppScore: 0 }` sans malus (y compris pour les matchs enregistrés avant l'introduction du malus). Le graphe de progression doit partir de ce point et non de `{0,0}` en dur.
 
 #### `timeouts` — repères de temps morts sur le graphe
 
@@ -177,11 +193,13 @@ Chaque combinaison unique de `(playerPosition, from, to, result)` devient une en
 |---|---|---|
 | `team` | `"mine"` \| `"opp"` | Équipe qui a demandé le temps mort |
 | `afterPoint` | `number` | Nombre de points déjà joués dans le set au moment de l'appel. Le repère se place **après** `timeline[afterPoint - 1]` (`0` = avant le premier point) |
-| `myScore` | `number` | Score équipe au moment de l'appel |
-| `oppScore` | `number` | Score adversaire au moment de l'appel |
+| `myScore` | `number` | Score équipe au moment de l'appel (malus déduits) |
+| `oppScore` | `number` | Score adversaire au moment de l'appel (malus déduits) |
 | `occurredAt` | `string` ISO 8601 | Timestamp |
 
 > Liste vide si aucun temps mort. Deux temps morts peuvent avoir le même `afterPoint` (les deux équipes pendant le même arrêt de jeu).
+
+> `afterPoint` reste le **nombre de points joués**, pas `myScore + oppScore` : avec un malus les deux diffèrent (ex. malus -2 `mine`, un point `opp`, puis temps mort → `afterPoint: 1`, `myScore: -2`, `oppScore: 1`).
 
 ---
 
@@ -258,6 +276,7 @@ Chaque combinaison unique de `(playerPosition, from, to, result)` devient une en
         "myScore": 4,
         "oppScore": 2,
         "wonBy": "mine",
+        "startScore": { "myScore": 0, "oppScore": 0 },
         "stats": {
           "actions": {
             "points": [
@@ -422,6 +441,11 @@ interface Timeout {
   occurredAt: string;  // ISO 8601
 }
 
+interface StartScore {
+  myScore: number;   // -malus de mon équipe dans le set, 0 sans malus
+  oppScore: number;  // -malus adverse dans le set, 0 sans malus
+}
+
 interface SetAnalysis {
   setNumber: number;
   myScore: number;
@@ -430,6 +454,7 @@ interface SetAnalysis {
   stats: ScopeStats;
   timeline: TimelineEntry[];
   timeouts: Timeout[];
+  startScore: StartScore;
 }
 
 interface PlayerSetStats {
@@ -460,6 +485,7 @@ interface LiveMatchAnalysis {
 
 - **Graphe progression set** : `sets[n].timeline` — tracer `myScore` / `oppScore` par index
 - **Temps morts** : `sets[n].timeouts` — tracer un repère vertical entre `timeline[afterPoint - 1]` et `timeline[afterPoint]`, couleur selon `team`. Les temps morts n'apparaissent ni dans `timeline` ni dans les stats d'actions
+- **Malus** : `sets[n].startScore` — premier point du graphe (`{0,0}` sans malus). Les malus n'apparaissent ni dans `timeline`, ni dans `timeouts`, ni dans les stats d'actions (équipe, set, joueur) ; leurs effets sont déjà déduits des scores cumulés
 - **`playerId: null` dans timeline** = point adverse (faute ou attaque adverse)
 - **Actions manquantes** : si un type d'action n'a pas été réalisé, il n'apparaît pas dans la liste (pas d'entrée count=0)
 - **`attacks`** : regroupées par combinaison unique `(playerPosition, from, to, result)`. Utiliser pour une heatmap de trajectoires ou un tableau position × zone

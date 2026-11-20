@@ -27,6 +27,8 @@ import java.util.UUID;
 import java.util.stream.IntStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static vasconcelos.volleymatch.LiveSnapshotFixtures.malus;
+import static vasconcelos.volleymatch.LiveSnapshotFixtures.opponentPoint;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.set;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.simpleSnapshot;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.snapshot;
@@ -137,9 +139,67 @@ class LiveSessionControllerIT extends LiveSessionITSupport {
         LiveSessionDto session = createSession(createTeam("Invalid", authToken), false);
 
         ResponseEntity<ApiResponse<LiveSnapshotResponse>> response =
-                putSnapshot(session, 1, snapshot(List.of(set(7, null, List.of()))), authToken);
+                putSnapshot(session, 1, snapshot(List.of(set(11, null, List.of()))), authToken);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void should_return200_when_snapshot_has_valid_malus() {
+        LiveSessionDto session = createSession(createTeam("Malus ok", authToken), false);
+
+        ResponseEntity<ApiResponse<LiveSnapshotResponse>> response = putSnapshot(session, 1, snapshot(List.of(
+                set(1, null, List.of(malus(1, "mine", 2), opponentPoint(2, 12))))), authToken);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    }
+
+    @Test
+    void should_return400_when_snapshot_malus_amount_is_invalid() {
+        LiveSessionDto session = createSession(createTeam("Malus amount", authToken), false);
+
+        ResponseEntity<ApiResponse<LiveSnapshotResponse>> response = putSnapshot(session, 1, snapshot(List.of(
+                set(1, null, List.of(malus(1, "mine", 3))))), authToken);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody().message()).contains("malusAmount");
+    }
+
+    @Test
+    void should_return400_when_snapshot_malus_comes_after_first_point() {
+        LiveSessionDto session = createSession(createTeam("Late malus", authToken), false);
+
+        ResponseEntity<ApiResponse<LiveSnapshotResponse>> response = putSnapshot(session, 1, snapshot(List.of(
+                set(1, null, List.of(opponentPoint(1, 12), malus(2, "mine", 2))))), authToken);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void should_return400_when_snapshot_has_two_malus_for_same_team_in_a_set() {
+        LiveSessionDto session = createSession(createTeam("Double malus", authToken), false);
+
+        ResponseEntity<ApiResponse<LiveSnapshotResponse>> response = putSnapshot(session, 1, snapshot(List.of(
+                set(1, null, List.of(malus(1, "opp", 1), malus(2, "opp", 1))))), authToken);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+    }
+
+    @Test
+    void should_return200_when_snapshot_events_have_no_malus_field() {
+        LiveSessionDto session = createSession(createTeam("Legacy", authToken), false);
+        String body = """
+                {"revision":1,"payload":{"sets":[{"setNumber":1,"events":[{"sequence":1,"team":"mine",
+                "player":{"jersey":7,"poste":"R4"},"action":{"key":"attack_pt","category":"point"},
+                "scoredFor":"mine"}]}]}}""";
+        HttpHeaders headers = authHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        ResponseEntity<String> response = restTemplate.exchange(
+                "/api/v1/live-sessions/" + session.sessionId() + "/snapshot", HttpMethod.PUT,
+                new HttpEntity<>(body, headers), String.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     }
 
     @Test

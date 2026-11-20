@@ -5,10 +5,12 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
+import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
 import vasconcelos.volleymatch.dto.live.LiveSetDto;
+import vasconcelos.volleymatch.exception.BadRequestException;
 import vasconcelos.volleymatch.dto.live.LiveStatsSavedResponse;
 import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
 import vasconcelos.volleymatch.dto.live.LiveStatsResponse;
@@ -23,6 +25,7 @@ import vasconcelos.volleymatch.repository.MatchRepository;
 import vasconcelos.volleymatch.service.AuthService;
 import vasconcelos.volleymatch.service.LiveStatsService;
 import vasconcelos.volleymatch.service.LiveSessionService;
+import vasconcelos.volleymatch.service.LiveStatsPayloadValidator;
 
 import java.time.Instant;
 import java.time.LocalDate;
@@ -57,6 +60,9 @@ class LiveStatsServiceTest {
     @Mock
     private LiveSessionService liveSessionService;
 
+    @Spy
+    private LiveStatsPayloadValidator payloadValidator = new LiveStatsPayloadValidator();
+
     @InjectMocks
     private LiveStatsService liveStatsService;
 
@@ -88,6 +94,21 @@ class LiveStatsServiceTest {
         assertThat(response.matchId()).isEqualTo("match-live-01");
         verify(matchRepository).save(match);
         verify(liveSessionRepository).save(session);
+    }
+
+    @Test
+    void should_reject_and_persist_nothing_when_payload_is_invalid() {
+        LiveStatsRequest base = buildRequest("match-invalid", 0, 0);
+        LiveStatsRequest request = new LiveStatsRequest(base.matchId(), base.teamId(), base.teamName(), base.title(),
+                base.venue(), base.recordedAt(), base.setsWon(),
+                List.of(LiveSnapshotFixtures.set(1, null, List.of(LiveSnapshotFixtures.malus(1, "mine", 3)))));
+
+        assertThatThrownBy(() -> liveStatsService.saveLiveStats(request))
+                .isInstanceOf(BadRequestException.class)
+                .hasMessageContaining("malusAmount");
+        verify(matchRepository, never()).save(any());
+        verify(liveSessionRepository, never()).save(any());
+        verify(liveSessionService, never()).attachMatch(any(), any(), any());
     }
 
     @Test

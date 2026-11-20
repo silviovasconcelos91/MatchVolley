@@ -167,11 +167,14 @@ Envoyer **l'état complet** du match (undo compris) : le snapshot est remplacé,
 
 - `revision` présent et ≥ 1, `payload` présent ;
 - `venue` ∈ `home` | `away` (si fourni) ;
-- `sets` présent (peut être vide), au plus 5, `setNumber` entre 1 et 5 et unique ;
+- `sets` présent (peut être vide), au plus 10, `setNumber` entre 1 et 10 et unique (borne de sécurité : un set à égalité ne compte pour personne, un match peut dépasser 5 sets) ;
 - `wonBy` ∈ `mine` | `opp` | `null` ;
-- chaque event : `sequence` ≥ 1, `team` ∈ `mine` | `opp`, `player.jersey` présent, `action.key` et `action.category` présents ;
+- chaque event : `sequence` ≥ 1, `team` ∈ `mine` | `opp`, `player.jersey` présent (sauf temps mort et malus), `action.key` et `action.category` présents ;
 - temps mort (`action.key == "timeout"`) : `player` peut être `null`, `category` doit être `neutral`, `trajectory` et `scoredFor` doivent être `null` ;
-- `action.category` ∈ `point` | `fault` | `neutral`, et `scoredFor` cohérent : `point` → `team`, `fault` → adversaire, `neutral` → `null` ;
+- malus (`action.key == "malus"`) : `category` doit être `malus` (et réciproquement), `player`, `trajectory` et `scoredFor` doivent être `null`, `malusAmount` ∈ `1` | `2` ;
+- malus : au plus un par équipe et par set, `sequence` strictement inférieure à celle du premier event avec `scoredFor != null` du set (ordre évalué sur `sequence`, pas sur la position dans la liste) ;
+- `malusAmount` non `null` sur un event autre qu'un malus → `400` (champ absent accepté : rétrocompatible) ;
+- `action.category` ∈ `point` | `fault` | `neutral` | `malus`, et `scoredFor` cohérent : `point` → `team`, `fault` → adversaire, `neutral` → `null` ;
 - `poste` hors liste → `400`.
 
 | Code | Cas |
@@ -268,6 +271,8 @@ Seul `showPlayerNames` est modifiable (les autres champs sont ignorés). Autoris
 Si la session appartient à l'utilisateur : `matchId` est enregistré sur la session et elle passe en `ENDED` (comme `:end`).
 Si l'ID est inconnu, expiré ou appartient à un autre utilisateur, il est **ignoré** : le match est quand même enregistré (`201`). Sans ce champ, le comportement est inchangé.
 
+Le payload est validé avec les **mêmes règles** que `PUT …/snapshot` (voir « Règles de validation (`400`) ») : un payload invalide renvoie `400` et rien n'est enregistré (ni match, ni clôture de session).
+
 ---
 
 ## 6. Vue publique (overlay)
@@ -354,10 +359,11 @@ Cache-Control: no-cache
 
 | Champ | Règle |
 |---|---|
-| Points | Seuls les events avec `scoredFor != null`. Les events `neutral` sont ignorés partout. Les scores sont **recalculés depuis les events** : un undo fait baisser le score. |
+| Points | Seuls les events avec `scoredFor != null`. Les events `neutral` sont ignorés partout. Les scores sont **recalculés depuis les events** : un undo fait baisser le score (un undo du malus le fait remonter). |
+| Malus | Le score de départ du set est `{ mine: -malus mine, opp: -malus opp }` (`{0,0}` sans malus) : `currentSet.score` et `sets[].score` sont malus déduits et peuvent être négatifs (ex. malus -2 `mine` puis 27-15 → `25-15`). Un malus n'est pas un point : ignoré pour `serving`, `lastPoints` (le `scoreAfter` des points suivants en tient compte), `topScorers` et `currentSet.timeouts` ; il ne termine pas un `activeTimeout` en cours |
 | `setsWon` | Nombre de sets dont `wonBy` est `mine` / `opp` |
 | `currentSet` | Set au plus grand `setNumber`. `null` si aucun set |
-| `trajectory` | Score cumulé après chaque point, en commençant par `{0,0}` |
+| `trajectory` | Score cumulé après chaque point, en commençant par le score de départ du set : `{0,0}`, ou malus déduits (ex. `{ "mine": -2, "opp": 0 }`) |
 | `serving` | `scoredFor` du dernier point du set (le gagnant du rallye sert). `null` si aucun point |
 | `currentSet.timeouts` | **Compteur** : nombre de temps morts pris par chaque équipe dans le set en cours (`{ mine, opp }`) |
 | `currentSet.activeTimeout` | **Bandeau** : `"mine"` / `"opp"` si le dernier event du set est un temps mort, sinon `null`. Le bandeau disparaît dès que l'app saisit l'event suivant (point, service, etc.). Le nom adverse n'est pas connu du backend : afficher « Adversaire » pour `"opp"` |
@@ -439,7 +445,7 @@ Utilisé par `PUT /live-sessions/{id}/snapshot` et par la soumission finale `POS
 
 | Champ | Type | Description |
 |---|---|---|
-| `setNumber` | `number` | Numéro du set (1–5) |
+| `setNumber` | `number` | Numéro du set (1–10). Au-delà de 5 sets : un set terminé à égalité (`wonBy: null`, tournoi au temps) ne compte pour personne, le match peut donc continuer |
 | `scoreTeam` | `number` | Points de mon équipe dans ce set (dérivé des events) |
 | `scoreOpp` | `number` | Points adversaire dans ce set (dérivé des events) |
 | `wonBy` | `"mine"` \| `"opp"` \| `null` | `null` si set en cours ou scores égaux |
@@ -452,11 +458,12 @@ Utilisé par `PUT /live-sessions/{id}/snapshot` et par la soumission finale `POS
 | `id` | `string` | ID unique de l'event |
 | `sequence` | `number` | Ordre dans le set (commence à 1) |
 | `ts` | `number` | Timestamp UNIX ms (horloge locale app) |
-| `team` | `"mine"` \| `"opp"` | Équipe qui réalise l'action (pour un temps mort : l'équipe qui l'a demandé) |
-| `player` | `PlayerPayload` \| `null` | Joueur. `null` uniquement pour un temps mort (`action.key == "timeout"`) |
+| `team` | `"mine"` \| `"opp"` | Équipe qui réalise l'action (pour un temps mort : l'équipe qui l'a demandé ; pour un malus : l'équipe pénalisée) |
+| `player` | `PlayerPayload` \| `null` | Joueur. `null` uniquement pour un temps mort (`action.key == "timeout"`) ou un malus (`action.key == "malus"`) |
 | `action` | `ActionPayload` | Action réalisée |
 | `trajectory` | `TrajectoryPayload` \| `null` | `null` si action sans zone |
-| `scoredFor` | `"mine"` \| `"opp"` \| `null` | Règle : `point` → team, `fault` → adversaire, `neutral` → `null` |
+| `scoredFor` | `"mine"` \| `"opp"` \| `null` | Règle : `point` → team, `fault` → adversaire, `neutral` → `null`, `malus` → `null` |
+| `malusAmount` | `1` \| `2` \| `null` | Points retirés à `team` en début de set. Malus uniquement ; `null` (ou absent) pour tout autre event |
 
 #### `PlayerPayload`
 
@@ -472,9 +479,9 @@ Utilisé par `PUT /live-sessions/{id}/snapshot` et par la soumission finale `POS
 
 | Champ | Type | Valeurs |
 |---|---|---|
-| `key` | `string` | `attack_pt`, `ace`, `block_pt`, `relance_pt`, `attack_fault`, `serve_fault`, `recv_fault`, `fault`, `good_recv`, `bad_recv`, `block_touch`, `serve_in`, `attack_no_pt`, `timeout` |
+| `key` | `string` | `attack_pt`, `ace`, `block_pt`, `relance_pt`, `attack_fault`, `serve_fault`, `recv_fault`, `fault`, `good_recv`, `bad_recv`, `block_touch`, `serve_in`, `attack_no_pt`, `timeout`, `malus` |
 | `label` | `string` | Label FR lisible |
-| `category` | `"point"` \| `"fault"` \| `"neutral"` | Catégorie |
+| `category` | `"point"` \| `"fault"` \| `"neutral"` \| `"malus"` | Catégorie (`malus` uniquement avec `key == "malus"`) |
 
 #### `TrajectoryPayload`
 
@@ -492,6 +499,7 @@ Utilisé par `PUT /live-sessions/{id}/snapshot` et par la soumission finale `POS
 - `trajectory.from: null` pour ace et service réussi (zone départ non saisie).
 - `player.id: null` pour tous les events adversaires.
 - **Temps mort** : event `action: { key: "timeout", label: "Temps mort", category: "neutral" }`, `team` = équipe qui l'a demandé, `player: null`, `trajectory: null`, `scoredFor: null`. Placé à sa position dans la séquence du set. Ignoré dans le score et les stats d'actions.
+- **Malus** : handicap fixé en début de set, event `action: { key: "malus", label: "Malus", category: "malus" }`, `team` = équipe **pénalisée**, `malusAmount` ∈ `1` | `2`, `player: null`, `trajectory: null`, `scoredFor: null`. Au plus un malus par équipe et par set, de `sequence` inférieure à celle de tout event avec `scoredFor != null` (un temps mort ou une action neutre peut le précéder). Score d'un set = nombre d'events `scoredFor == équipe` − `malusAmount` des malus de l'équipe : il peut être négatif (ex. `-2` avant le premier point). Un malus n'est pas un point : ignoré pour le service, les derniers points, les meilleurs marqueurs et les stats d'actions.
 
 ---
 

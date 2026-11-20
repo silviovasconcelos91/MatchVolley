@@ -14,6 +14,7 @@ import vasconcelos.volleymatch.dto.live.LiveEventDto;
 import vasconcelos.volleymatch.dto.live.LiveMatchAnalysisResponse;
 import vasconcelos.volleymatch.dto.live.LivePlayerDto;
 import vasconcelos.volleymatch.dto.live.LiveScopeStatsDto;
+import vasconcelos.volleymatch.dto.live.LiveScoreDto;
 import vasconcelos.volleymatch.dto.live.LiveTimeoutDto;
 import vasconcelos.volleymatch.dto.live.LiveTrajectoryDto;
 import vasconcelos.volleymatch.dto.live.TimelineEntryDto;
@@ -29,6 +30,7 @@ import vasconcelos.volleymatch.service.LiveStatsAnalysisService;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Optional;
@@ -65,13 +67,13 @@ class LiveStatsAnalysisServiceTest {
                 : new LivePlayerDto(null, 5, "Adv #5", playerPos, null);
         LiveActionDto action = new LiveActionDto(key, label, category);
         LiveTrajectoryDto traj = (trajFrom != null || trajTo != null) ? new LiveTrajectoryDto(trajFrom, trajTo) : null;
-        return new LiveEventDto("ev-" + seq, seq, 1000L * seq, team, player, action, traj, scoredFor);
+        return new LiveEventDto("ev-" + seq, seq, 1000L * seq, team, player, action, traj, scoredFor, null);
     }
 
     private LiveEventDto mineEventWithPoste(int seq, String key, String category, Long playerId, VolleyPosition poste) {
         return new LiveEventDto("ev-" + seq, seq, 1000L * seq, "mine",
                 new LivePlayerDto(playerId, 7, "Dupont", 4, poste),
-                new LiveActionDto(key, key, category), null, "point".equals(category) ? "mine" : null);
+                new LiveActionDto(key, key, category), null, "point".equals(category) ? "mine" : null, null);
     }
 
     private MatchLiveSetEvent setEvent(int setNum, List<LiveEventDto> events) {
@@ -288,6 +290,117 @@ class LiveStatsAnalysisServiceTest {
         assertThat(result.sets().get(0).timeouts()).extracting(LiveTimeoutDto::team, LiveTimeoutDto::afterPoint)
                 .containsExactly(tuple("opp", 1));
         assertThat(result.players()).hasSize(1);
+    }
+
+    // ── malus ──────────────────────────────────────────────────────────────────
+
+    @Test
+    void should_startTimeline_from_malus_score_without_malus_entry() {
+        var events = List.of(
+                LiveSnapshotFixtures.malus(1, "mine", 2),
+                event(2, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1)
+        );
+
+        List<TimelineEntryDto> timeline = service.buildTimeline(events);
+
+        assertThat(timeline).hasSize(1);
+        assertThat(timeline.get(0).myScore()).isEqualTo(-1);
+        assertThat(timeline.get(0).oppScore()).isZero();
+    }
+
+    @Test
+    void should_deductMalus_in_timeline_when_events_are_not_in_sequence_order() {
+        var events = List.of(
+                event(2, "opp", "attack_pt", "point", "Attaque", "opp", null, 4, 4, 6),
+                LiveSnapshotFixtures.malus(1, "opp", 1)
+        );
+
+        assertThat(service.buildTimeline(events).get(0).oppScore()).isZero();
+    }
+
+    @Test
+    void should_scoreTimeout_with_malus_and_count_afterPoint_as_points_played() {
+        var events = List.of(
+                LiveSnapshotFixtures.malus(1, "mine", 2),
+                event(2, "opp", "attack_pt", "point", "Attaque", "opp", null, 4, 4, 6),
+                LiveSnapshotFixtures.timeout(3, "mine")
+        );
+
+        assertThat(service.buildTimeouts(events)).containsExactly(
+                new LiveTimeoutDto("mine", 1, -2, 1, Instant.ofEpochMilli(1_003L)));
+    }
+
+    @Test
+    void should_excludeMalus_from_team_and_set_actionStats() {
+        var events = List.of(
+                LiveSnapshotFixtures.malus(1, "mine", 2),
+                event(2, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1)
+        );
+        var sess = sessionWith("m-malus", List.of(setEvent(1, events)));
+        when(liveSessionRepository.findByMatch_IdAndMatch_User("m-malus", testUser)).thenReturn(Optional.of(sess));
+
+        LiveMatchAnalysisResponse result = service.getMatchAnalysis("m-malus");
+
+        assertThat(allActionKeys(result.globalStats())).containsExactly("attack_pt");
+        assertThat(allActionKeys(result.sets().get(0).stats())).containsExactly("attack_pt");
+        assertThat(result.players()).hasSize(1);
+        assertThat(allActionKeys(result.players().get(0).matchStats())).containsExactly("attack_pt");
+    }
+
+    @Test
+    void should_excludeMalus_from_player_actionStats_when_malus_carries_a_player() {
+        var malusWithPlayer = new LiveEventDto("ev-1", 1, 1_000L, "mine",
+                new LivePlayerDto(3L, 7, "Dupont", 4, null),
+                new LiveActionDto("malus", "Malus", "malus"), null, null, 2);
+        var events = List.of(
+                malusWithPlayer,
+                event(2, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1)
+        );
+        var sess = sessionWith("m-malus-player", List.of(setEvent(1, events)));
+        when(liveSessionRepository.findByMatch_IdAndMatch_User("m-malus-player", testUser)).thenReturn(Optional.of(sess));
+
+        LiveMatchAnalysisResponse result = service.getMatchAnalysis("m-malus-player");
+
+        assertThat(result.players()).hasSize(1);
+        assertThat(allActionKeys(result.players().get(0).matchStats())).containsExactly("attack_pt");
+        assertThat(allActionKeys(result.players().get(0).setStats().get(0).stats())).containsExactly("attack_pt");
+    }
+
+    @Test
+    void should_exposeStartScore_with_both_malus_when_set_has_malus() {
+        var events = List.of(
+                LiveSnapshotFixtures.malus(1, "mine", 2),
+                LiveSnapshotFixtures.malus(2, "opp", 1),
+                event(3, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1)
+        );
+        var sess = sessionWith("m-start", List.of(setEvent(1, events)));
+        when(liveSessionRepository.findByMatch_IdAndMatch_User("m-start", testUser)).thenReturn(Optional.of(sess));
+
+        LiveMatchAnalysisResponse result = service.getMatchAnalysis("m-start");
+
+        assertThat(result.sets().get(0).startScore()).isEqualTo(new LiveScoreDto(-2, -1));
+        assertThat(result.sets().get(0).timeline().get(0).myScore()).isEqualTo(-1);
+    }
+
+    @Test
+    void should_exposeZeroStartScore_when_set_has_no_malus_or_no_events() {
+        var withEvents = setEvent(1, List.of(event(1, "mine", "attack_pt", "point", "Attaque", "mine", 3L, 4, 4, 1)));
+        var noEvents = setEvent(2, null);
+        var sess = sessionWith("m-zero", List.of(withEvents, noEvents));
+        when(liveSessionRepository.findByMatch_IdAndMatch_User("m-zero", testUser)).thenReturn(Optional.of(sess));
+
+        LiveMatchAnalysisResponse result = service.getMatchAnalysis("m-zero");
+
+        assertThat(result.sets()).extracting(s -> s.startScore())
+                .containsExactly(new LiveScoreDto(0, 0), new LiveScoreDto(0, 0));
+    }
+
+    private static List<String> allActionKeys(LiveScopeStatsDto stats) {
+        List<String> keys = new ArrayList<>();
+        stats.actions().points().forEach(a -> keys.add(a.key()));
+        stats.actions().faults().forEach(a -> keys.add(a.key()));
+        stats.actions().neutral().forEach(a -> keys.add(a.key()));
+        return keys;
     }
 
     // ── computePlayerAnalysis ──────────────────────────────────────────────────

@@ -2,6 +2,7 @@ package vasconcelos.volleymatch;
 
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import vasconcelos.volleymatch.dto.live.LiveEventDto;
 import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
 import vasconcelos.volleymatch.dto.livesession.LiveMatchState;
 import vasconcelos.volleymatch.dto.livesession.PublicPlayerDto;
@@ -14,12 +15,15 @@ import vasconcelos.volleymatch.repository.LiveSessionRepository;
 import vasconcelos.volleymatch.service.LivePublicViewService;
 
 import java.time.Clock;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 import static org.mockito.Mockito.mock;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.attackPoint;
+import static vasconcelos.volleymatch.LiveSnapshotFixtures.malus;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.myFault;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.neutral;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.opponentFault;
@@ -115,6 +119,104 @@ class LivePublicViewServiceTest {
         assertThat(state.currentSet().trajectory()).containsExactly(new ScoreDto(0, 0), new ScoreDto(1, 0));
         assertThat(state.lastPoints()).hasSize(1);
         assertThat(state.topScorers()).hasSize(1);
+    }
+
+    // ── malus ─────────────────────────────────────────────────────────────────
+
+    @Test
+    void should_deduct_malus_from_set_score_when_malus_then_points() {
+        List<LiveEventDto> events = new ArrayList<>();
+        events.add(malus(1, "mine", 2));
+        int seq = 2;
+        for (int i = 0; i < 27; i++) {
+            events.add(attackPoint(seq++, 3L, 7, "Dupont"));
+        }
+        for (int i = 0; i < 15; i++) {
+            events.add(opponentPoint(seq++, 12));
+        }
+
+        LiveMatchState state = compute(snapshot(List.of(set(1, null, events))), true);
+
+        assertThat(state.currentSet().score()).isEqualTo(new ScoreDto(25, 15));
+        assertThat(state.sets()).extracting(s -> s.score()).containsExactly(new ScoreDto(25, 15));
+    }
+
+    @Test
+    void should_start_trajectory_at_negative_score_when_malus_alone() {
+        LiveMatchState state = compute(snapshot(List.of(set(1, null, List.of(malus(1, "mine", 2))))), true);
+
+        assertThat(state.currentSet().score()).isEqualTo(new ScoreDto(-2, 0));
+        assertThat(state.currentSet().trajectory()).containsExactly(new ScoreDto(-2, 0));
+        assertThat(state.currentSet().serving()).isNull();
+    }
+
+    @Test
+    void should_ignore_malus_in_serving_and_last_points_when_point_follows() {
+        LiveMatchState state = compute(snapshot(List.of(set(1, null, List.of(
+                malus(1, "mine", 2),
+                opponentPoint(2, 12))))), true);
+
+        assertThat(state.currentSet().trajectory()).containsExactly(new ScoreDto(-2, 0), new ScoreDto(-2, 1));
+        assertThat(state.currentSet().serving()).isEqualTo("opp");
+        assertThat(state.lastPoints()).extracting(PublicPointDto::sequence, PublicPointDto::scoreAfter)
+                .containsExactly(tuple(2, new ScoreDto(-2, 1)));
+    }
+
+    @Test
+    void should_start_trajectory_with_both_malus_when_events_are_unordered() {
+        LiveMatchState state = compute(snapshot(List.of(set(1, null, List.of(
+                attackPoint(3, 3L, 7, "Dupont"),
+                malus(2, "opp", 1),
+                malus(1, "mine", 2))))), true);
+
+        assertThat(state.currentSet().trajectory()).containsExactly(new ScoreDto(-2, -1), new ScoreDto(-1, -1));
+    }
+
+    @Test
+    void should_exclude_malus_from_last_points_top_scorers_and_timeouts() {
+        LiveMatchState state = compute(snapshot(List.of(set(1, null, List.of(
+                malus(1, "mine", 1),
+                attackPoint(2, 3L, 7, "Dupont"))))), true);
+
+        assertThat(state.lastPoints()).extracting(PublicPointDto::sequence).containsExactly(2);
+        assertThat(state.topScorers()).hasSize(1);
+        assertThat(state.topScorers().get(0).points()).isEqualTo(1);
+        assertThat(state.currentSet().timeouts()).isEqualTo(new ScoreDto(0, 0));
+    }
+
+    @Test
+    void should_keep_active_timeout_when_malus_follows_timeout() {
+        LiveMatchState state = compute(snapshot(List.of(set(1, null, List.of(
+                timeout(1, "opp"),
+                malus(2, "mine", 2))))), true);
+
+        assertThat(state.currentSet().activeTimeout()).isEqualTo("opp");
+        assertThat(state.currentSet().timeouts()).isEqualTo(new ScoreDto(0, 1));
+    }
+
+    @Test
+    void should_restore_score_when_next_snapshot_drops_the_malus() {
+        LiveMatchState withMalus = compute(snapshot(List.of(set(1, null, List.of(
+                malus(1, "mine", 2),
+                attackPoint(2, 3L, 7, "Dupont"))))), true);
+        LiveMatchState undone = compute(snapshot(List.of(set(1, null, List.of(
+                attackPoint(2, 3L, 7, "Dupont"))))), true);
+
+        assertThat(withMalus.currentSet().score()).isEqualTo(new ScoreDto(-1, 0));
+        assertThat(undone.currentSet().score()).isEqualTo(new ScoreDto(1, 0));
+        assertThat(undone.currentSet().trajectory()).containsExactly(new ScoreDto(0, 0), new ScoreDto(1, 0));
+    }
+
+    @Test
+    void should_show_sixth_set_as_current_when_a_set_ended_tied() {
+        LiveMatchState state = compute(snapshot(LiveSnapshotFixtures.sixSetsAfterTiedSet()), true);
+
+        assertThat(state.sets()).extracting(s -> s.setNumber()).containsExactly(1, 2, 3, 4, 5, 6);
+        assertThat(state.sets().get(2).wonBy()).isNull();
+        assertThat(state.sets().get(2).score()).isEqualTo(new ScoreDto(1, 1));
+        assertThat(state.setsWon()).isEqualTo(new ScoreDto(2, 2));
+        assertThat(state.currentSet().setNumber()).isEqualTo(6);
+        assertThat(state.currentSet().score()).isEqualTo(new ScoreDto(1, -1));
     }
 
     @Test

@@ -27,8 +27,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
-import static vasconcelos.volleymatch.service.LiveStatsPayloadValidator.MINE;
-import static vasconcelos.volleymatch.service.LiveStatsPayloadValidator.OPP;
+import static vasconcelos.volleymatch.service.LiveEventRules.MINE;
+import static vasconcelos.volleymatch.service.LiveEventRules.OPP;
 
 /**
  * Builds the public (unauthenticated) live view from the stored snapshot. All score
@@ -113,19 +113,24 @@ public class LivePublicViewService {
         int setsWonOpp = 0;
 
         for (LiveSetDto set : orderedSets) {
-            int mine = 0;
-            int opp = 0;
+            // A malus is a start-of-set handicap: the set (and its trajectory) starts at -malusAmount.
+            int mine = -LiveEventRules.malusOf(set.events(), MINE);
+            int opp = -LiveEventRules.malusOf(set.events(), OPP);
             int timeoutsMine = 0;
             int timeoutsOpp = 0;
             String lastScorer = null;
             String activeTimeout = null;
             List<ScoreDto> trajectory = new ArrayList<>();
-            trajectory.add(new ScoreDto(0, 0));
+            trajectory.add(new ScoreDto(mine, opp));
 
             for (LiveEventDto event : orderedEvents(set)) {
+                if (LiveEventRules.isMalus(event)) {
+                    // Already applied to the starting score; not a game action, so a running timeout stays active.
+                    continue;
+                }
                 // Any event after a timeout ends it: only a trailing timeout stays active.
                 activeTimeout = null;
-                if (LiveStatsPayloadValidator.isTimeout(event)) {
+                if (LiveEventRules.isTimeout(event)) {
                     if (MINE.equals(event.team())) {
                         timeoutsMine++;
                     } else if (OPP.equals(event.team())) {

@@ -9,7 +9,9 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import vasconcelos.volleymatch.dto.common.ApiResponse;
+import vasconcelos.volleymatch.dto.live.LiveEventDto;
 import vasconcelos.volleymatch.dto.livesession.LiveSessionDto;
+import vasconcelos.volleymatch.dto.livesession.LiveSnapshotResponse;
 import vasconcelos.volleymatch.dto.livesession.PublicLiveViewDto;
 import vasconcelos.volleymatch.dto.livesession.ScoreDto;
 import vasconcelos.volleymatch.dto.livesession.UpdateLiveSessionRequest;
@@ -18,12 +20,14 @@ import vasconcelos.volleymatch.model.live.LiveSessionStatus;
 import vasconcelos.volleymatch.repository.LiveSessionRepository;
 
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.attackPoint;
+import static vasconcelos.volleymatch.LiveSnapshotFixtures.malus;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.opponentPoint;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.set;
 import static vasconcelos.volleymatch.LiveSnapshotFixtures.simpleSnapshot;
@@ -76,6 +80,55 @@ class PublicLiveControllerIT extends LiveSessionITSupport {
         assertThat(after.currentSet().activeTimeout()).isNull();
         assertThat(after.currentSet().timeouts()).isEqualTo(new ScoreDto(1, 0));
         assertThat(after.currentSet().score()).isEqualTo(new ScoreDto(1, 1));
+    }
+
+    private static List<LiveEventDto> malusThenPoints(int mine, int opp) {
+        List<LiveEventDto> events = new ArrayList<>();
+        events.add(malus(1, "mine", 2));
+        int seq = 2;
+        for (int i = 0; i < mine; i++) {
+            events.add(attackPoint(seq++, 3L, 7, "Dupont"));
+        }
+        for (int i = 0; i < opp; i++) {
+            events.add(opponentPoint(seq++, 12));
+        }
+        return events;
+    }
+
+    @Test
+    void should_deduct_malus_from_public_score_and_restore_it_on_undo() {
+        LiveSessionDto session = createSession(createTeam("Malus", authToken), false);
+        List<LiveEventDto> withMalus = malusThenPoints(27, 15);
+
+        ResponseEntity<ApiResponse<LiveSnapshotResponse>> put =
+                putSnapshot(session, 1, snapshot(List.of(set(1, null, withMalus))), authToken);
+        PublicLiveViewDto during = getPublic(session.code(), anonymous()).getBody().data();
+
+        putSnapshot(session, 2, snapshot(List.of(set(1, null, withMalus.subList(1, withMalus.size())))), authToken);
+        PublicLiveViewDto undone = getPublic(session.code(), anonymous()).getBody().data();
+
+        assertThat(put.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(during.currentSet().score()).isEqualTo(new ScoreDto(25, 15));
+        assertThat(during.sets()).extracting(s -> s.score()).containsExactly(new ScoreDto(25, 15));
+        assertThat(during.currentSet().trajectory().getFirst()).isEqualTo(new ScoreDto(-2, 0));
+        assertThat(undone.currentSet().score()).isEqualTo(new ScoreDto(27, 15));
+        assertThat(undone.currentSet().trajectory().getFirst()).isEqualTo(new ScoreDto(0, 0));
+    }
+
+    @Test
+    void should_accept_sixth_set_snapshot_and_show_it_as_current_set() {
+        LiveSessionDto session = createSession(createTeam("Six sets", authToken), false);
+
+        ResponseEntity<ApiResponse<LiveSnapshotResponse>> put =
+                putSnapshot(session, 1, snapshot(LiveSnapshotFixtures.sixSetsAfterTiedSet()), authToken);
+        PublicLiveViewDto view = getPublic(session.code(), anonymous()).getBody().data();
+
+        assertThat(put.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(put.getBody().data().applied()).isTrue();
+        assertThat(view.sets()).hasSize(6);
+        assertThat(view.setsWon()).isEqualTo(new ScoreDto(2, 2));
+        assertThat(view.currentSet().setNumber()).isEqualTo(6);
+        assertThat(view.currentSet().score()).isEqualTo(new ScoreDto(1, -1));
     }
 
     @Test

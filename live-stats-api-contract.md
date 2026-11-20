@@ -11,6 +11,13 @@ POST /api/v1/matches/{matchId}/live-stats
 Content-Type: application/json
 ```
 
+| Code | Cas |
+|---|---|
+| `201` | Match enregistré |
+| `400` | Payload invalide : mêmes règles que `PUT /live-sessions/{id}/snapshot` (voir `live-overlay-api-doc.md`, « Règles de validation »), dont les règles du malus (voir « Règles dérivées »). Rien n'est enregistré |
+| `401` | Token absent ou invalide |
+| `409` | `matchId` déjà enregistré |
+
 ---
 
 ## Champs racine
@@ -30,9 +37,9 @@ Content-Type: application/json
 
 | Champ | Type | Description |
 |---|---|---|
-| `setNumber` | `number` | Numéro du set (1–5) |
-| `scoreTeam` | `number` | Points de mon équipe dans ce set (dérivé des events) |
-| `scoreOpp` | `number` | Points adversaire dans ce set (dérivé des events) |
+| `setNumber` | `number` | Numéro du set (1–10). Au-delà de 5 sets : un set terminé à égalité (`wonBy: null`, tournoi au temps) ne compte pour personne, le match peut donc continuer |
+| `scoreTeam` | `number` | Points de mon équipe dans ce set (dérivé des events, malus déduits ; peut être négatif) |
+| `scoreOpp` | `number` | Points adversaire dans ce set (dérivé des events, malus déduits ; peut être négatif) |
 | `wonBy` | `"mine"` \| `"opp"` \| `null` | `null` si set en cours ou scores égaux |
 | `events` | `EventPayload[]` | Events du set, ordonnés par `sequence` (repart à 1 par set) |
 
@@ -43,11 +50,12 @@ Content-Type: application/json
 | `id` | `string` | ID unique de l'event |
 | `sequence` | `number` | Ordre dans le set (commence à 1) |
 | `ts` | `number` | Timestamp UNIX ms (horloge locale app) |
-| `team` | `"mine"` \| `"opp"` | Équipe qui réalise l'action (pour un temps mort : l'équipe qui l'a demandé) |
-| `player` | `PlayerPayload` \| `null` | Joueur. `null` uniquement pour un temps mort (`action.key == "timeout"`) |
+| `team` | `"mine"` \| `"opp"` | Équipe qui réalise l'action (pour un temps mort : l'équipe qui l'a demandé ; pour un malus : l'équipe pénalisée) |
+| `player` | `PlayerPayload` \| `null` | Joueur. `null` uniquement pour un temps mort (`action.key == "timeout"`) ou un malus (`action.key == "malus"`) |
 | `action` | `ActionPayload` | Action réalisée |
 | `trajectory` | `TrajectoryPayload` \| `null` | `null` si action sans zone |
-| `scoredFor` | `"mine"` \| `"opp"` \| `null` | Règle : `point` → team, `fault` → adversaire, `neutral` → `null` |
+| `scoredFor` | `"mine"` \| `"opp"` \| `null` | Règle : `point` → team, `fault` → adversaire, `neutral` → `null`, `malus` → `null` |
+| `malusAmount` | `1` \| `2` \| `null` | Points retirés à `team` en début de set. Malus uniquement ; `null` (ou absent) pour tout autre event |
 
 ### `PlayerPayload`
 
@@ -63,9 +71,9 @@ Content-Type: application/json
 
 | Champ | Type | Valeurs |
 |---|---|---|
-| `key` | `string` | `attack_pt`, `ace`, `block_pt`, `relance_pt`, `attack_fault`, `serve_fault`, `recv_fault`, `fault`, `good_recv`, `bad_recv`, `block_touch`, `serve_in`, `attack_no_pt`, `timeout` |
+| `key` | `string` | `attack_pt`, `ace`, `block_pt`, `relance_pt`, `attack_fault`, `serve_fault`, `recv_fault`, `fault`, `good_recv`, `bad_recv`, `block_touch`, `serve_in`, `attack_no_pt`, `timeout`, `malus` |
 | `label` | `string` | Label FR lisible |
-| `category` | `"point"` \| `"fault"` \| `"neutral"` | Catégorie |
+| `category` | `"point"` \| `"fault"` \| `"neutral"` \| `"malus"` | Catégorie (`malus` uniquement avec `key == "malus"`) |
 
 ### `TrajectoryPayload`
 
@@ -244,13 +252,14 @@ Content-Type: application/json
 
 ## Règles dérivées
 
-- `scoreTeam` / `scoreOpp` : comptés depuis les events (`scoredFor`). Backend peut recalculer.
+- `scoreTeam` / `scoreOpp` : comptés depuis les events (`scoredFor`), moins les `malusAmount` des malus de l'équipe. Backend peut recalculer ; à la soumission finale (`POST …/live-stats`) il stocke les valeurs reçues telles quelles.
 - `setsWon` : mis à jour uniquement quand "Set suivant" est validé. Le set en cours n'y figure pas encore.
 - `wonBy: null` : set encore en cours **ou** scores à égalité.
 - `sequence` repart à `1` à chaque nouveau set.
 - `trajectory.from: null` pour ace et service réussi (zone départ non saisie).
 - `player.id: null` pour tous les events adversaires.
 - **Temps mort** : event `action: { key: "timeout", label: "Temps mort", category: "neutral" }`, `team` = équipe qui l'a demandé, `player: null`, `trajectory: null`, `scoredFor: null`. Placé à sa position dans la séquence du set. Ignoré dans le score et les stats d'actions.
+- **Malus** (règles imposées par le serveur : `400` sinon) : handicap fixé en début de set, event `action: { key: "malus", label: "Malus", category: "malus" }`, `team` = équipe **pénalisée**, `malusAmount` ∈ `1` | `2`, `player: null`, `trajectory: null`, `scoredFor: null`. Au plus un malus par équipe et par set, de `sequence` inférieure à celle de tout event avec `scoredFor != null` (un temps mort ou une action neutre peut le précéder). Score d'un set = nombre d'events `scoredFor == équipe` − `malusAmount` des malus de l'équipe : il peut être négatif (ex. `-2` avant le premier point). Un malus n'est pas un point : ignoré pour le service, les derniers points, les meilleurs marqueurs et les stats d'actions.
 
 ---
 

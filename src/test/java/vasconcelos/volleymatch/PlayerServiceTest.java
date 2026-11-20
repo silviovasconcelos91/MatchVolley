@@ -74,7 +74,7 @@ class PlayerServiceTest {
     private LiveEventDto liveEvent(String team, Long playerId, VolleyPosition poste, String key, String category) {
         return new LiveEventDto("ev", 1, 0L, team,
                 new LivePlayerDto(playerId, 7, "Dupont", 4, poste),
-                new LiveActionDto(key, key, category), null, null);
+                new LiveActionDto(key, key, category), null, null, null);
     }
 
     private MatchLiveSession liveSession(String matchId, List<List<LiveEventDto>> eventsPerSet) {

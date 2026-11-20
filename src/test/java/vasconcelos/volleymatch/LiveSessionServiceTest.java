@@ -180,7 +180,7 @@ class LiveSessionServiceTest {
         when(repository.findByIdForUpdate(s.getId())).thenReturn(Optional.of(s));
 
         assertThatThrownBy(() -> service.updateSnapshot(s.getId(),
-                new LiveSnapshotRequest(4L, snapshot(List.of(set(9, null, List.of()))))))
+                new LiveSnapshotRequest(4L, snapshot(List.of(set(11, null, List.of()))))))
                 .isInstanceOf(BadRequestException.class);
         assertThat(s.getRevision()).isEqualTo(3);
     }

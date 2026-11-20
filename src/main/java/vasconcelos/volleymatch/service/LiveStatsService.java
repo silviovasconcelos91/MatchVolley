@@ -25,8 +25,14 @@ public class LiveStatsService {
     private final LiveStatsMapper liveStatsMapper;
     private final AuthService authService;
     private final LiveSessionService liveSessionService;
+    private final LiveStatsPayloadValidator payloadValidator;
 
+    /**
+     * Same structural contract as the live snapshot ({@link LiveStatsPayloadValidator}): an invalid payload is
+     * rejected (400) before anything is persisted, so the analysis only reads validated events.
+     */
     public LiveStatsSavedResponse saveLiveStats(LiveStatsRequest request) {
+        payloadValidator.validate(request);
         if (matchRepository.existsById(request.matchId())) {
             throw new IllegalArgumentException("Match already exists: " + request.matchId());
         }

@@ -8,8 +8,14 @@ import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
 import vasconcelos.volleymatch.exception.BadRequestException;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+
+import static vasconcelos.volleymatch.service.LiveEventRules.MINE;
+import static vasconcelos.volleymatch.service.LiveEventRules.OPP;
+import static vasconcelos.volleymatch.service.LiveEventRules.isMalus;
+import static vasconcelos.volleymatch.service.LiveEventRules.isTimeout;
 
 /**
  * Structural validation of a {@link LiveStatsRequest} according to docs/live-stats-api-contract.md.
@@ -18,20 +24,16 @@ import java.util.Set;
 @Component
 public class LiveStatsPayloadValidator {
 
-    static final String MINE = "mine";
-    static final String OPP = "opp";
     private static final Set<String> TEAMS = Set.of(MINE, OPP);
     private static final Set<String> VENUES = Set.of("home", "away");
-    private static final int MAX_SETS = 5;
-    static final String TIMEOUT_KEY = "timeout";
-    private static final String NEUTRAL = "neutral";
-
     /**
-     * A timeout is a neutral event without player: it never scores and is excluded from action stats.
+     * Sanity bound, not a volleyball rule: a set ended tied (time-limited tournament) counts for nobody, so a
+     * match can go past 5 sets (front: no cap on NEXT_SET). 10 = 5 decisive sets + 5 tied sets.
      */
-    static boolean isTimeout(LiveEventDto event) {
-        return event != null && event.action() != null && TIMEOUT_KEY.equals(event.action().key());
-    }
+    private static final int MAX_SETS = 10;
+    private static final String NEUTRAL = "neutral";
+    private static final String MALUS_CATEGORY = "malus";
+    private static final Set<Integer> MALUS_AMOUNTS = Set.of(1, 2);
 
     public void validate(LiveStatsRequest payload) {
         if (payload == null) {
@@ -72,6 +74,34 @@ public class LiveStatsPayloadValidator {
         for (LiveEventDto event : set.events()) {
             validateEvent(setNumber, event);
         }
+        validateMalusPlacement(setNumber, set.events());
+    }
+
+    /**
+     * At most one malus per team, each one strictly before the first scoring event of the set. Order is
+     * evaluated on {@code sequence}, not on the position in the list. Events are already individually valid.
+     */
+    private void validateMalusPlacement(int setNumber, List<LiveEventDto> events) {
+        Integer firstScoringSequence = null;
+        for (LiveEventDto event : events) {
+            if (event.scoredFor() != null
+                    && (firstScoringSequence == null || event.sequence() < firstScoringSequence)) {
+                firstScoringSequence = event.sequence();
+            }
+        }
+        Set<String> penalizedTeams = new HashSet<>();
+        for (LiveEventDto event : events) {
+            if (!isMalus(event)) {
+                continue;
+            }
+            String where = "set " + setNumber + ": event " + event.sequence() + ": ";
+            if (!penalizedTeams.add(event.team())) {
+                throw new BadRequestException(where + "at most one malus per team and per set");
+            }
+            if (firstScoringSequence != null && event.sequence() >= firstScoringSequence) {
+                throw new BadRequestException(where + "malus must come before the first point of the set");
+            }
+        }
     }
 
     private void validateEvent(int setNumber, LiveEventDto event) {
@@ -89,6 +119,16 @@ public class LiveStatsPayloadValidator {
         LiveActionDto action = event.action();
         if (action == null || action.key() == null || action.category() == null) {
             throw new BadRequestException(where + "action.key and action.category are required");
+        }
+        if (isMalus(event)) {
+            validateMalus(where, event);
+            return;
+        }
+        if (event.malusAmount() != null) {
+            throw new BadRequestException(where + "malusAmount is only allowed on a malus event");
+        }
+        if (MALUS_CATEGORY.equals(action.category())) {
+            throw new BadRequestException(where + "action.category 'malus' requires action.key 'malus'");
         }
         if (isTimeout(event)) {
             validateTimeout(where, event);
@@ -114,6 +154,24 @@ public class LiveStatsPayloadValidator {
         }
         if (event.trajectory() != null) {
             throw new BadRequestException(where + "timeout must have trajectory null");
+        }
+    }
+
+    private void validateMalus(String where, LiveEventDto event) {
+        if (!MALUS_CATEGORY.equals(event.action().category())) {
+            throw new BadRequestException(where + "action.key 'malus' requires action.category 'malus'");
+        }
+        if (event.player() != null) {
+            throw new BadRequestException(where + "malus must have player null");
+        }
+        if (event.trajectory() != null) {
+            throw new BadRequestException(where + "malus must have trajectory null");
+        }
+        if (event.scoredFor() != null) {
+            throw new BadRequestException(where + "malus must have scoredFor null");
+        }
+        if (event.malusAmount() == null || !MALUS_AMOUNTS.contains(event.malusAmount())) {
+            throw new BadRequestException(where + "malusAmount must be 1 or 2");
         }
     }
 }
