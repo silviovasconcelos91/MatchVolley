@@ -29,6 +29,9 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Set;
 
+import static vasconcelos.volleymatch.service.LiveEventRules.MINE;
+import static vasconcelos.volleymatch.service.LiveEventRules.OPP;
+
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
@@ -52,12 +55,14 @@ public class LiveStatsAnalysisService {
         List<LiveSetAnalysisDto> sets = session.getSets().stream()
                 .map(se -> {
                     List<LiveEventDto> events = se.getEvents() == null ? List.of() : se.getEvents();
+                    // One replay (one sort) per set feeds timeline, timeouts and start score.
+                    LiveSetReplay replay = LiveSetReplay.of(events);
                     return new LiveSetAnalysisDto(
                             se.getSet(), se.getScoreTeam(), se.getScoreOpp(), se.getWonBy(),
                             computeScopeStats(events),
-                            buildTimeline(events),
-                            buildTimeouts(events),
-                            startScore(events)
+                            timelineOf(replay),
+                            timeoutsOf(replay),
+                            new LiveScoreDto(replay.startMine(), replay.startOpp())
                     );
                 })
                 .toList();
@@ -72,7 +77,7 @@ public class LiveStatsAnalysisService {
 
     public LiveScopeStatsDto computeScopeStats(List<LiveEventDto> events) {
         List<LiveEventDto> mine = events.stream()
-                .filter(e -> "mine".equals(e.team())
+                .filter(e -> MINE.equals(e.team())
                         && !LiveEventRules.isTimeout(e)
                         && !LiveEventRules.isMalus(e))
                 .toList();
@@ -151,58 +156,47 @@ public class LiveStatsAnalysisService {
     }
 
     /**
-     * Score at the start of a set: malus deducted, {@code {0, 0}} without malus.
+     * One entry per scoring event, in {@code sequence} order, cumulative score starting from the replay's start
+     * score ({@link LiveSetReplay#startMine()}, {@link LiveSetReplay#startOpp()}: malus deducted; malus have no
+     * entry). Single-set entry point kept for unit tests: production goes through {@link #getMatchAnalysis}.
      */
-    public LiveScoreDto startScore(List<LiveEventDto> events) {
-        return new LiveScoreDto(
-                -LiveEventRules.malusOf(events, "mine"),
-                -LiveEventRules.malusOf(events, "opp"));
+    public List<TimelineEntryDto> buildTimeline(List<LiveEventDto> events) {
+        return timelineOf(LiveSetReplay.of(events));
     }
 
     /**
-     * One entry per scoring event, cumulative score starting from {@link #startScore} (malus have no entry).
+     * Timeout markers positioned against {@link #buildTimeline}, in {@code sequence} order: {@code afterPoint} is
+     * the number of scoring events before the timeout (not the sum of the scores, which malus make lower); the
+     * scores start from the replay's start score ({@link LiveSetReplay}). Single-set entry point kept for unit
+     * tests: production goes through {@link #getMatchAnalysis}.
      */
-    public List<TimelineEntryDto> buildTimeline(List<LiveEventDto> events) {
-        if (events == null || events.isEmpty()) return List.of();
-        List<TimelineEntryDto> timeline = new ArrayList<>();
-        LiveScoreDto start = startScore(events);
-        int myScore = start.myScore(), oppScore = start.oppScore();
-        for (LiveEventDto e : events) {
-            if (e.scoredFor() == null) continue;
-            if ("mine".equals(e.scoredFor())) myScore++;
-            else if ("opp".equals(e.scoredFor())) oppScore++;
-            Long playerId = ("mine".equals(e.team()) && e.player() != null) ? e.player().id() : null;
+    public List<LiveTimeoutDto> buildTimeouts(List<LiveEventDto> events) {
+        return timeoutsOf(LiveSetReplay.of(events));
+    }
+
+    private static List<TimelineEntryDto> timelineOf(LiveSetReplay replay) {
+        List<TimelineEntryDto> timeline = new ArrayList<>(replay.points().size());
+        for (LiveSetReplay.Point point : replay.points()) {
+            LiveEventDto e = point.event();
+            Long playerId = (MINE.equals(e.team()) && e.player() != null) ? e.player().id() : null;
             String action = e.action() != null ? e.action().key() : null;
-            Instant occurredAt = e.ts() != null ? Instant.ofEpochMilli(e.ts()) : null;
-            timeline.add(new TimelineEntryDto(myScore, oppScore, playerId, action, occurredAt));
+            timeline.add(new TimelineEntryDto(point.mine(), point.opp(), playerId, action, instantOf(e)));
         }
         return timeline;
     }
 
-    /**
-     * Timeout markers positioned against {@link #buildTimeline}: {@code afterPoint} is the number of
-     * scoring events before the timeout (not the sum of the scores, which malus make lower); the scores start
-     * from {@link #startScore}. Events are expected in sequence order (as stored).
-     */
-    public List<LiveTimeoutDto> buildTimeouts(List<LiveEventDto> events) {
-        if (events == null || events.isEmpty()) return List.of();
-        List<LiveTimeoutDto> timeouts = new ArrayList<>();
-        LiveScoreDto start = startScore(events);
-        int myScore = start.myScore(), oppScore = start.oppScore();
-        int pointsPlayed = 0;
-        for (LiveEventDto e : events) {
-            if (LiveEventRules.isTimeout(e)) {
-                Instant occurredAt = e.ts() != null ? Instant.ofEpochMilli(e.ts()) : null;
-                timeouts.add(new LiveTimeoutDto(e.team(), pointsPlayed, myScore, oppScore, occurredAt));
-            } else if ("mine".equals(e.scoredFor())) {
-                myScore++;
-                pointsPlayed++;
-            } else if ("opp".equals(e.scoredFor())) {
-                oppScore++;
-                pointsPlayed++;
-            }
+    private static List<LiveTimeoutDto> timeoutsOf(LiveSetReplay replay) {
+        List<LiveTimeoutDto> timeouts = new ArrayList<>(replay.timeouts().size());
+        for (LiveSetReplay.Timeout timeout : replay.timeouts()) {
+            LiveEventDto e = timeout.event();
+            timeouts.add(new LiveTimeoutDto(e.team(), timeout.afterPoint(), timeout.mine(), timeout.opp(),
+                    instantOf(e)));
         }
         return timeouts;
+    }
+
+    private static Instant instantOf(LiveEventDto event) {
+        return event.ts() != null ? Instant.ofEpochMilli(event.ts()) : null;
     }
 
     public List<LivePlayerAnalysisDto> computePlayerAnalysis(List<MatchLiveSetEvent> sets) {
@@ -212,7 +206,7 @@ public class LiveStatsAnalysisService {
         for (MatchLiveSetEvent se : sets) {
             if (se.getEvents() == null) continue;
             for (LiveEventDto e : se.getEvents()) {
-                if ("mine".equals(e.team()) && e.player() != null && e.player().id() != null) {
+                if (MINE.equals(e.team()) && e.player() != null && e.player().id() != null) {
                     playerMap.putIfAbsent(e.player().id(), e.player());
                 }
             }
@@ -228,7 +222,7 @@ public class LiveStatsAnalysisService {
             for (MatchLiveSetEvent se : sets) {
                 if (se.getEvents() == null) continue;
                 List<LiveEventDto> playerSetEvents = se.getEvents().stream()
-                        .filter(e -> "mine".equals(e.team())
+                        .filter(e -> MINE.equals(e.team())
                                 && e.player() != null
                                 && playerId.equals(e.player().id()))
                         .toList();

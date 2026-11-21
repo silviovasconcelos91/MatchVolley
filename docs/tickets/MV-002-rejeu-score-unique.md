@@ -2,13 +2,13 @@
 id: MV-002
 titre: Unifier le rejeu du score d'un set entre l'overlay et l'analyse
 type: dette
-statut: PRÊT
+statut: TERMINÉ
 priorite: moyenne
 cree: 2026-11-20
-maj: 2026-11-20
+maj: 2026-11-21
 depend_de: [MV-001]
-branche:
-debat:
+branche: feat/MV-002-rejeu-score-unique
+debat: docs/reviews/2026-11-21-MV-002-rejeu-score-unique/
 ---
 
 # MV-002 — Unifier le rejeu du score d'un set entre l'overlay et l'analyse
@@ -30,15 +30,15 @@ L'analyse utilise en plus les littéraux `"mine"`/`"opp"` (l.75, 158-159, 172-17
 En tant que staff qui analyse un match après coup, je veux que la timeline et les scores aux temps morts de l'analyse soient calculés comme le score de l'overlay, afin de voir le même déroulé de set partout, quel que soit l'ordre de stockage des events.
 
 ## Critères d'acceptation
-- [ ] **CA-1** — Étant donné un set dont les events sont stockés dans un ordre différent de leur `sequence` (ex. stockés 3, 1, 2), quand l'analyse est calculée, alors `timeline` contient une entrée par event marquant, dans l'ordre des `sequence`, avec le score cumulé correct après chaque point (test unitaire `LiveStatsAnalysisServiceTest`).
-- [ ] **CA-2** — Étant donné le même set dans le désordre, avec un temps mort entre deux points, quand l'analyse est calculée, alors `timeouts[].afterPoint`, `myScore` et `oppScore` correspondent à la position du temps mort selon `sequence` (test unitaire).
-- [ ] **CA-3** — Étant donné un même `LiveStatsRequest` (avec malus, temps morts, actions neutres, events dans le désordre), quand on calcule l'overlay (`computeState`) et l'analyse, alors la trajectoire de l'overlay (`currentSet.trajectory`, hors point de départ) et les scores de la `timeline` de l'analyse sont identiques, et le score de départ de l'overlay est égal au `startScore` de l'analyse (test unitaire croisé).
-- [ ] **CA-4** — Étant donné des events dont la `sequence` est `null` (données stockées avant la validation du POST), quand l'overlay ou l'analyse est calculé, alors ces events sont rejoués en dernier, dans leur ordre stocké, sans exception (même comportement que `orderedEvents` aujourd'hui, `nullsLast`).
-- [ ] **CA-5** — Étant donné deux events de même `sequence`, quand le set est rejoué, alors leur ordre stocké relatif est conservé (tri stable).
-- [ ] **CA-6** — Tous les tests existants de l'overlay et de l'analyse (`LivePublicViewServiceTest`, `LiveStatsAnalysisServiceTest`, `PublicLiveControllerIT`, `LiveStatsControllerIT`) passent sans modification de leurs assertions. Le contrat JSON de `GET /public/live/{code}` et de `GET /matches/{id}/live-stats/analysis` est inchangé.
-- [ ] **CA-7** — Il n'existe sous `src/main` qu'une seule implémentation du cumul de score d'un set (incrément sur `scoredFor`) : `grep -rn "scoredFor()" src/main/java/vasconcelos/volleymatch/service` ne montre l'incrément que dans le composant de rejeu (plus le validateur, qui ne cumule pas).
-- [ ] **CA-8** — `LiveStatsAnalysisService` n'utilise plus de littéral `"mine"` ni `"opp"` : `grep -n '"mine"\|"opp"' src/main/java/vasconcelos/volleymatch/service/LiveStatsAnalysisService.java` est vide (usage de `LiveEventRules.MINE`/`OPP`).
-- [ ] **CA-9** — Le composant de rejeu a ses propres tests unitaires (`XxxTest`, sans contexte Spring) : set vide, `events` null, malus seul, malus puis points, temps mort final actif, temps mort suivi d'un point, events dans le désordre.
+- [x] **CA-1** — Étant donné un set dont les events sont stockés dans un ordre différent de leur `sequence` (ex. stockés 3, 1, 2), quand l'analyse est calculée, alors `timeline` contient une entrée par event marquant, dans l'ordre des `sequence`, avec le score cumulé correct après chaque point (test unitaire `LiveStatsAnalysisServiceTest`).
+- [x] **CA-2** — Étant donné le même set dans le désordre, avec un temps mort entre deux points, quand l'analyse est calculée, alors `timeouts[].afterPoint`, `myScore` et `oppScore` correspondent à la position du temps mort selon `sequence` (test unitaire).
+- [x] **CA-3** — Étant donné un même `LiveStatsRequest` (avec malus, temps morts, actions neutres, events dans le désordre), quand on calcule l'overlay (`computeState`) et l'analyse, alors la trajectoire de l'overlay (`currentSet.trajectory`, hors point de départ) et les scores de la `timeline` de l'analyse sont identiques, et le score de départ de l'overlay est égal au `startScore` de l'analyse (test unitaire croisé).
+- [x] **CA-4** — Étant donné des events dont la `sequence` est `null` (données stockées avant la validation du POST), quand l'overlay ou l'analyse est calculé, alors ces events sont rejoués en dernier, dans leur ordre stocké, sans exception (même comportement que `orderedEvents` aujourd'hui, `nullsLast`).
+- [x] **CA-5** — Étant donné deux events de même `sequence`, quand le set est rejoué, alors leur ordre stocké relatif est conservé (tri stable).
+- [x] **CA-6** — Tous les tests existants de l'overlay et de l'analyse (`LivePublicViewServiceTest`, `LiveStatsAnalysisServiceTest`, `PublicLiveControllerIT`, `LiveStatsControllerIT`) passent sans modification de leurs assertions. Le contrat JSON de `GET /public/live/{code}` et de `GET /matches/{id}/live-stats/analysis` est inchangé.
+- [x] **CA-7** — Il n'existe sous `src/main` qu'une seule implémentation du cumul de score d'un set (incrément sur `scoredFor`) : `grep -rn "scoredFor()" src/main/java/vasconcelos/volleymatch/service` ne montre l'incrément que dans le composant de rejeu (plus le validateur, qui ne cumule pas).
+- [x] **CA-8** — `LiveStatsAnalysisService` n'utilise plus de littéral `"mine"` ni `"opp"` : `grep -n '"mine"\|"opp"' src/main/java/vasconcelos/volleymatch/service/LiveStatsAnalysisService.java` est vide (usage de `LiveEventRules.MINE`/`OPP`).
+- [x] **CA-9** — Le composant de rejeu a ses propres tests unitaires (`XxxTest`, sans contexte Spring) : set vide, `events` null, malus seul, malus puis points, temps mort final actif, temps mort suivi d'un point, events dans le désordre.
 
 ## Règles métier
 - Le malus est un handicap de début de set : le rejeu part du score `{-malusMine, -malusOpp}` (`LiveEventRules.malusOf`), le malus n'apparaît ni dans la timeline ni dans la trajectoire comme point (existant, MV-001 CA-9/CA-14).
@@ -74,8 +74,12 @@ En tant que staff qui analyse un match après coup, je veux que la timeline et l
 - Régression sur l'overlay (chemin public) lors de l'extraction — mitigation : CA-6 (tests existants inchangés) et CA-3 (test croisé overlay/analyse).
 - Dégradation de perf sur le poll overlay — mitigation : relecture `perf`, pas plus d'un tri par set et par appel.
 - Branche dépendante de MV-001 (`LiveEventRules` n'existe que sur `feat/MV-001-event-malus`) — mitigation : démarrer après la fusion de MV-001.
+- Analyses enregistrées avant 8712564 (MV-001), dont le POST n'était pas validé : la timeline d'un tel match peut changer, au-delà du seul réordonnancement. Un temps mort ou un malus porteur d'un `scoredFor`, ou un `scoredFor` autre que `mine`/`opp`, ne produit plus d'entrée de timeline (avant : une entrée, non comptée dans `afterPoint` des temps morts). Changement assumé (revue MV-002, CRIT-002) : la timeline et `timeouts` sont désormais alignés. Impact attendu nul, mais non prouvé, faute d'accès aux données de prod. Verrouillé par `LiveStatsAnalysisServiceTest#should_align_timeline_and_timeouts_when_unvalidated_timeout_carries_scoredFor`.
 
 ## Historique
 | Date | Statut | Événement |
 |---|---|---|
 | 2026-11-20 | PRÊT | Création depuis la dette ARCH-D01 (revue MV-001), sans question ouverte |
+| 2026-11-21 | EN COURS | Développement lancé via dev-debate (base 73e5c66) — exécution autonome autorisée par l'utilisateur |
+| 2026-11-21 | EN REVUE | Implémentation terminée (./mvnw clean test : 323 tests verts, vérifié orchestrateur), revue critic/perf/architect |
+| 2026-11-21 | TERMINÉ | Débat terminé : PRÊT, 1 round, voir docs/reviews/2026-11-21-MV-002-rejeu-score-unique/SYNTHESE.md. Mergé sur master en local (autorisation utilisateur) |

@@ -6,7 +6,7 @@ import java.util.List;
 
 /**
  * Semantics of live stats events shared by validation ({@link LiveStatsPayloadValidator}) and score
- * restitution ({@link LivePublicViewService}, {@link LiveStatsAnalysisService}).
+ * restitution ({@link LiveSetReplay}, used by {@link LivePublicViewService} and {@link LiveStatsAnalysisService}).
  */
 public final class LiveEventRules {
 

@@ -163,7 +163,7 @@ Chaque combinaison unique de `(playerPosition, from, to, result)` devient une en
 | `action` | `string` | Clé de l'action |
 | `occurredAt` | `string` ISO 8601 | Timestamp |
 
-> Tracer `myScore` et `oppScore` en fonction de l'index pour la courbe de progression, en partant de `startScore`.
+> Une entrée par point, dans l'ordre de `sequence` des events du set (quel que soit leur ordre de stockage). Tracer `myScore` et `oppScore` en fonction de l'index pour la courbe de progression, en partant de `startScore`.
 
 > **Malus** : les scores cumulés sont malus déduits (ils partent de `startScore`, et peuvent être négatifs). Un malus n'est pas un point : il n'a **pas** d'entrée dans `timeline`. Ex. malus -2 `mine` puis un point `mine` → `timeline[0]` = `{ myScore: -1, oppScore: 0 }`.
 
@@ -197,7 +197,7 @@ Chaque combinaison unique de `(playerPosition, from, to, result)` devient une en
 | `oppScore` | `number` | Score adversaire au moment de l'appel (malus déduits) |
 | `occurredAt` | `string` ISO 8601 | Timestamp |
 
-> Liste vide si aucun temps mort. Deux temps morts peuvent avoir le même `afterPoint` (les deux équipes pendant le même arrêt de jeu).
+> Dans l'ordre de `sequence` des events du set (quel que soit leur ordre de stockage). Liste vide si aucun temps mort. Deux temps morts peuvent avoir le même `afterPoint` (les deux équipes pendant le même arrêt de jeu).
 
 > `afterPoint` reste le **nombre de points joués**, pas `myScore + oppScore` : avec un malus les deux diffèrent (ex. malus -2 `mine`, un point `opp`, puis temps mort → `afterPoint: 1`, `myScore: -2`, `oppScore: 1`).
 

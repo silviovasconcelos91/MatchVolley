@@ -108,60 +108,35 @@ public class LivePublicViewService {
 
         List<PublicSetDto> sets = new ArrayList<>();
         List<PublicPointDto> allPoints = new ArrayList<>();
+        List<LiveSetReplay> replays = new ArrayList<>(orderedSets.size());
         PublicCurrentSetDto currentSet = null;
         int setsWonMine = 0;
         int setsWonOpp = 0;
 
         for (LiveSetDto set : orderedSets) {
-            // A malus is a start-of-set handicap: the set (and its trajectory) starts at -malusAmount.
-            int mine = -LiveEventRules.malusOf(set.events(), MINE);
-            int opp = -LiveEventRules.malusOf(set.events(), OPP);
-            int timeoutsMine = 0;
-            int timeoutsOpp = 0;
-            String lastScorer = null;
-            String activeTimeout = null;
-            List<ScoreDto> trajectory = new ArrayList<>();
-            trajectory.add(new ScoreDto(mine, opp));
-
-            for (LiveEventDto event : orderedEvents(set)) {
-                if (LiveEventRules.isMalus(event)) {
-                    // Already applied to the starting score; not a game action, so a running timeout stays active.
-                    continue;
-                }
-                // Any event after a timeout ends it: only a trailing timeout stays active.
-                activeTimeout = null;
-                if (LiveEventRules.isTimeout(event)) {
-                    if (MINE.equals(event.team())) {
-                        timeoutsMine++;
-                    } else if (OPP.equals(event.team())) {
-                        timeoutsOpp++;
-                    }
-                    activeTimeout = event.team();
-                    continue;
-                }
-                if (event.scoredFor() == null) {
-                    continue;
-                }
-                if (MINE.equals(event.scoredFor())) {
-                    mine++;
-                } else {
-                    opp++;
-                }
-                lastScorer = event.scoredFor();
-                ScoreDto scoreAfter = new ScoreDto(mine, opp);
+            // The only sort of this set's events for this call: topScorers reuses replay.events().
+            LiveSetReplay replay = LiveSetReplay.of(set.events());
+            replays.add(replay);
+            List<ScoreDto> trajectory = new ArrayList<>(replay.points().size() + 1);
+            trajectory.add(new ScoreDto(replay.startMine(), replay.startOpp()));
+            for (LiveSetReplay.Point point : replay.points()) {
+                ScoreDto scoreAfter = new ScoreDto(point.mine(), point.opp());
                 trajectory.add(scoreAfter);
-                allPoints.add(toPoint(set.setNumber(), event, scoreAfter, showPlayerNames));
+                // PublicPointDto.sequence is a non-null number: a legacy point without sequence is not listed.
+                if (point.event().sequence() != null) {
+                    allPoints.add(toPoint(set.setNumber(), point.event(), scoreAfter, showPlayerNames));
+                }
             }
 
-            ScoreDto score = new ScoreDto(mine, opp);
+            ScoreDto score = new ScoreDto(replay.mine(), replay.opp());
             sets.add(new PublicSetDto(set.setNumber(), score, set.wonBy()));
             if (MINE.equals(set.wonBy())) {
                 setsWonMine++;
             } else if (OPP.equals(set.wonBy())) {
                 setsWonOpp++;
             }
-            currentSet = new PublicCurrentSetDto(set.setNumber(), score, lastScorer, trajectory,
-                    new ScoreDto(timeoutsMine, timeoutsOpp), activeTimeout);
+            currentSet = new PublicCurrentSetDto(set.setNumber(), score, replay.lastScorer(), trajectory,
+                    timeoutCounts(replay), replay.activeTimeout());
         }
 
         return new LiveMatchState(
@@ -169,17 +144,21 @@ public class LivePublicViewService {
                 currentSet,
                 sets,
                 lastPoints(allPoints),
-                topScorers(orderedSets, showPlayerNames)
+                topScorers(replays, showPlayerNames)
         );
     }
 
-    private static List<LiveEventDto> orderedEvents(LiveSetDto set) {
-        if (set.events() == null) {
-            return List.of();
+    private static ScoreDto timeoutCounts(LiveSetReplay replay) {
+        int mine = 0;
+        int opp = 0;
+        for (LiveSetReplay.Timeout timeout : replay.timeouts()) {
+            if (MINE.equals(timeout.event().team())) {
+                mine++;
+            } else if (OPP.equals(timeout.event().team())) {
+                opp++;
+            }
         }
-        return set.events().stream()
-                .sorted(Comparator.comparing(LiveEventDto::sequence, Comparator.nullsLast(Comparator.naturalOrder())))
-                .toList();
+        return new ScoreDto(mine, opp);
     }
 
     private PublicPointDto toPoint(int setNumber, LiveEventDto event, ScoreDto scoreAfter, boolean showPlayerNames) {
@@ -202,11 +181,14 @@ public class LivePublicViewService {
         return chronological.subList(from, chronological.size()).reversed();
     }
 
-    private static List<PublicTopScorerDto> topScorers(List<LiveSetDto> sets, boolean showPlayerNames) {
+    /**
+     * Iterates the events already sorted by each set's replay: the first name seen, in sequence order, wins.
+     */
+    private static List<PublicTopScorerDto> topScorers(List<LiveSetReplay> replays, boolean showPlayerNames) {
         Map<Integer, Integer> pointsByJersey = new LinkedHashMap<>();
         Map<Integer, String> nameByJersey = new LinkedHashMap<>();
-        for (LiveSetDto set : sets) {
-            for (LiveEventDto event : orderedEvents(set)) {
+        for (LiveSetReplay replay : replays) {
+            for (LiveEventDto event : replay.events()) {
                 if (!MINE.equals(event.team()) || event.action() == null || !POINT.equals(event.action().category())
                         || event.player() == null || event.player().jersey() == null) {
                     continue;

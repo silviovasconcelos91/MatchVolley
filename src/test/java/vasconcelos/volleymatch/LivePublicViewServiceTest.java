@@ -2,6 +2,7 @@ package vasconcelos.volleymatch;
 
 import org.junit.jupiter.api.Test;
 import org.mapstruct.factory.Mappers;
+import vasconcelos.volleymatch.dto.live.LiveActionDto;
 import vasconcelos.volleymatch.dto.live.LiveEventDto;
 import vasconcelos.volleymatch.dto.live.LiveStatsRequest;
 import vasconcelos.volleymatch.dto.livesession.LiveMatchState;
@@ -229,6 +230,74 @@ class LivePublicViewServiceTest {
 
         assertThat(state.currentSet().trajectory()).containsExactly(
                 new ScoreDto(0, 0), new ScoreDto(1, 0), new ScoreDto(1, 1));
+    }
+
+    // ── characterization of the replay order (MV-002) ────────────────────────
+
+    @Test
+    void should_replay_null_sequence_events_last_in_stored_order_when_legacy_payload() {
+        LiveEventDto legacyOpp = new LiveEventDto("legacy-opp", null, 1_000L, "opp",
+                null, new LiveActionDto("attack_pt", "Attaque", "point"),
+                null, "opp", null);
+        LiveEventDto legacyMine = new LiveEventDto("legacy-mine", null, 1_001L, "mine",
+                null, new LiveActionDto("attack_pt", "Attaque", "point"),
+                null, "mine", null);
+        LiveStatsRequest snap = snapshot(List.of(set(1, null, List.of(
+                legacyOpp,
+                attackPoint(2, 3L, 7, "Dupont"),
+                legacyMine,
+                attackPoint(1, 3L, 7, "Dupont")))));
+
+        LiveMatchState state = compute(snap, true);
+
+        assertThat(state.currentSet().trajectory()).containsExactly(
+                new ScoreDto(0, 0), new ScoreDto(1, 0), new ScoreDto(2, 0), new ScoreDto(2, 1), new ScoreDto(3, 1));
+        assertThat(state.currentSet().score()).isEqualTo(new ScoreDto(3, 1));
+        assertThat(state.currentSet().serving()).isEqualTo("mine");
+        // PublicPointDto.sequence is a non-null number in the contract: a point without sequence is not listed.
+        assertThat(state.lastPoints()).extracting(PublicPointDto::sequence).containsExactly(2, 1);
+    }
+
+    @Test
+    void should_keep_stored_relative_order_when_two_events_share_a_sequence() {
+        LiveStatsRequest snap = snapshot(List.of(set(1, null, List.of(
+                opponentPoint(1, 12),
+                attackPoint(1, 3L, 7, "Dupont")))));
+
+        LiveMatchState state = compute(snap, true);
+
+        assertThat(state.currentSet().trajectory()).containsExactly(
+                new ScoreDto(0, 0), new ScoreDto(0, 1), new ScoreDto(1, 1));
+        assertThat(state.currentSet().serving()).isEqualTo("mine");
+    }
+
+    @Test
+    void should_report_last_points_and_active_timeout_in_sequence_order_when_payload_is_unordered() {
+        LiveStatsRequest snap = snapshot(List.of(set(1, null, List.of(
+                timeout(4, "opp"),
+                opponentPoint(3, 12),
+                attackPoint(1, 3L, 7, "Dupont"),
+                opponentFault(2, 9)))));
+
+        LiveMatchState state = compute(snap, true);
+
+        assertThat(state.lastPoints()).extracting(PublicPointDto::sequence, PublicPointDto::scoreAfter)
+                .containsExactly(tuple(3, new ScoreDto(2, 1)), tuple(2, new ScoreDto(2, 0)), tuple(1, new ScoreDto(1, 0)));
+        assertThat(state.currentSet().activeTimeout()).isEqualTo("opp");
+        assertThat(state.currentSet().timeouts()).isEqualTo(new ScoreDto(0, 1));
+        assertThat(state.currentSet().serving()).isEqualTo("opp");
+    }
+
+    @Test
+    void should_name_top_scorer_from_lowest_sequence_when_payload_is_unordered() {
+        LiveStatsRequest snap = snapshot(List.of(set(1, null, List.of(
+                attackPoint(2, 3L, 7, "Renamed"),
+                attackPoint(1, 3L, 7, "Dupont")))));
+
+        LiveMatchState state = compute(snap, true);
+
+        assertThat(state.topScorers()).extracting(t -> t.name(), t -> t.points())
+                .containsExactly(tuple("Dupont", 2));
     }
 
     @Test

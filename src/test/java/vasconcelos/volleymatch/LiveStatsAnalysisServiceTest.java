@@ -395,6 +395,125 @@ class LiveStatsAnalysisServiceTest {
                 .containsExactly(new LiveScoreDto(0, 0), new LiveScoreDto(0, 0));
     }
 
+    // ── characterization of timeline / timeouts (MV-002) ─────────────────────
+
+    @Test
+    void should_exposeFullTimelineAndTimeouts_when_orderedSetWithMalusTimeoutAndNeutral() {
+        var events = List.of(
+                LiveSnapshotFixtures.malus(1, "opp", 1),
+                LiveSnapshotFixtures.attackPoint(2, 3L, 7, "Dupont"),
+                LiveSnapshotFixtures.neutral(3, 4L, 1, "Martin"),
+                LiveSnapshotFixtures.timeout(4, "opp"),
+                LiveSnapshotFixtures.opponentPoint(5, 12),
+                LiveSnapshotFixtures.opponentFault(6, 9),
+                LiveSnapshotFixtures.myFault(7, 8L, 2, "Leroy")
+        );
+        var sess = sessionWith("m-char", List.of(setEvent(1, events)));
+        when(liveSessionRepository.findByMatch_IdAndMatch_User("m-char", testUser)).thenReturn(Optional.of(sess));
+
+        var set = service.getMatchAnalysis("m-char").sets().get(0);
+
+        assertThat(set.startScore()).isEqualTo(new LiveScoreDto(0, -1));
+        assertThat(set.timeline()).containsExactly(
+                new TimelineEntryDto(1, -1, 3L, "attack_pt", Instant.ofEpochMilli(1_002L)),
+                new TimelineEntryDto(1, 0, null, "attack_pt", Instant.ofEpochMilli(1_005L)),
+                new TimelineEntryDto(2, 0, null, "serve_fault", Instant.ofEpochMilli(1_006L)),
+                new TimelineEntryDto(2, 1, 8L, "attack_fault", Instant.ofEpochMilli(1_007L)));
+        assertThat(set.timeouts()).containsExactly(
+                new LiveTimeoutDto("opp", 1, 1, -1, Instant.ofEpochMilli(1_004L)));
+    }
+
+    @Test
+    void should_returnEmptyTimelineAndTimeouts_when_eventsNullOrEmpty() {
+        assertThat(service.buildTimeline(null)).isEmpty();
+        assertThat(service.buildTimeline(List.of())).isEmpty();
+        assertThat(service.buildTimeouts(null)).isEmpty();
+    }
+
+    // ── replay order = sequence (MV-002) ─────────────────────────────────────
+
+    @Test
+    void should_buildTimeline_in_sequence_order_when_events_stored_unordered() {
+        var events = List.of(
+                LiveSnapshotFixtures.opponentPoint(3, 12),
+                LiveSnapshotFixtures.attackPoint(1, 3L, 7, "Dupont"),
+                LiveSnapshotFixtures.opponentFault(2, 9)
+        );
+        var sess = sessionWith("m-unordered", List.of(setEvent(1, events)));
+        when(liveSessionRepository.findByMatch_IdAndMatch_User("m-unordered", testUser)).thenReturn(Optional.of(sess));
+
+        List<TimelineEntryDto> timeline = service.getMatchAnalysis("m-unordered").sets().get(0).timeline();
+
+        assertThat(timeline).containsExactly(
+                new TimelineEntryDto(1, 0, 3L, "attack_pt", Instant.ofEpochMilli(1_001L)),
+                new TimelineEntryDto(2, 0, null, "serve_fault", Instant.ofEpochMilli(1_002L)),
+                new TimelineEntryDto(2, 1, null, "attack_pt", Instant.ofEpochMilli(1_003L)));
+    }
+
+    @Test
+    void should_placeTimeout_by_sequence_when_events_stored_unordered() {
+        var events = List.of(
+                LiveSnapshotFixtures.opponentPoint(3, 12),
+                LiveSnapshotFixtures.timeout(2, "opp"),
+                LiveSnapshotFixtures.attackPoint(1, 3L, 7, "Dupont")
+        );
+        var sess = sessionWith("m-unordered-to", List.of(setEvent(1, events)));
+        when(liveSessionRepository.findByMatch_IdAndMatch_User("m-unordered-to", testUser)).thenReturn(Optional.of(sess));
+
+        List<LiveTimeoutDto> timeouts = service.getMatchAnalysis("m-unordered-to").sets().get(0).timeouts();
+
+        assertThat(timeouts).containsExactly(new LiveTimeoutDto("opp", 1, 1, 0, Instant.ofEpochMilli(1_002L)));
+    }
+
+    @Test
+    void should_replay_null_sequence_events_last_when_legacy_events() {
+        var legacyTimeout = new LiveEventDto("legacy-to", null, 900L, "mine", null,
+                new LiveActionDto("timeout", "Temps mort", "neutral"), null, null, null);
+        var legacyPoint = new LiveEventDto("legacy-pt", null, 901L, "opp", null,
+                new LiveActionDto("attack_pt", "Attaque", "point"), null, "opp", null);
+        var events = List.of(
+                legacyTimeout,
+                legacyPoint,
+                LiveSnapshotFixtures.attackPoint(1, 3L, 7, "Dupont")
+        );
+
+        assertThat(service.buildTimeline(events)).extracting(TimelineEntryDto::myScore, TimelineEntryDto::oppScore)
+                .containsExactly(tuple(1, 0), tuple(1, 1));
+        assertThat(service.buildTimeouts(events)).containsExactly(
+                new LiveTimeoutDto("mine", 1, 1, 0, Instant.ofEpochMilli(900L)));
+    }
+
+    @Test
+    void should_align_timeline_and_timeouts_when_unvalidated_timeout_carries_scoredFor() {
+        // Pre-MV-001 matches were stored without validation: a timeout carrying scoredFor is still not a point.
+        var timeoutWithScoredFor = new LiveEventDto("legacy-to", 2, 1_002L, "mine", null,
+                new LiveActionDto("timeout", "Temps mort", "neutral"), null, "mine", null);
+        var events = List.of(
+                LiveSnapshotFixtures.attackPoint(1, 3L, 7, "Dupont"),
+                timeoutWithScoredFor,
+                LiveSnapshotFixtures.opponentPoint(3, 12)
+        );
+        var sess = sessionWith("m-legacy-to", List.of(setEvent(1, events)));
+        when(liveSessionRepository.findByMatch_IdAndMatch_User("m-legacy-to", testUser)).thenReturn(Optional.of(sess));
+
+        var set = service.getMatchAnalysis("m-legacy-to").sets().get(0);
+
+        assertThat(set.timeline()).extracting(TimelineEntryDto::myScore, TimelineEntryDto::oppScore)
+                .containsExactly(tuple(1, 0), tuple(1, 1));
+        assertThat(set.timeouts()).containsExactly(new LiveTimeoutDto("mine", 1, 1, 0, Instant.ofEpochMilli(1_002L)));
+    }
+
+    @Test
+    void should_keep_stored_relative_order_when_events_share_a_sequence() {
+        var events = List.of(
+                LiveSnapshotFixtures.opponentPoint(1, 12),
+                LiveSnapshotFixtures.attackPoint(1, 3L, 7, "Dupont")
+        );
+
+        assertThat(service.buildTimeline(events)).extracting(TimelineEntryDto::myScore, TimelineEntryDto::oppScore)
+                .containsExactly(tuple(0, 1), tuple(1, 1));
+    }
+
     private static List<String> allActionKeys(LiveScopeStatsDto stats) {
         List<String> keys = new ArrayList<>();
         stats.actions().points().forEach(a -> keys.add(a.key()));
